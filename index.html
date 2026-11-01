@@ -1,0 +1,812 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<!-- head:start -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="레슨장부">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#FFF9EF">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<!-- head:end -->
+<title>국악 레슨장부</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
+<style>
+/* 레이아웃: 화면 전체가 하나의 장부. 날짜 열과 이름 행을 고정한 표가 주인공이고, 나머지는 아래에서 올라오는 시트로 처리한다. */
+/* 밝은 단일 테마. 학생 색은 분류(gr-*)가 --c 값을 정하고, 표시 요소는 그 값만 쓴다. */
+:root {
+  color-scheme: light;
+  --bg: #FFF9EF; --surface: #FFFDF8; --sunken: #F7EEDF; --line: #EFE3D3; --fg: #4A3640; --muted: #7A6370; --muted-strong: #6F5864;
+  --accent: #B14A74; --accent-ink: #9C3E66; --plan: #94806F;
+  --green: #37804F; --green-soft: #E3F3E6; --green-ink: #2C6A40;
+  --blue: #3A72B8; --blue-soft: #E2EEFB; --blue-ink: #2F5F9C;
+  --pink: #C8437A; --pink-soft: #FDE6EF; --pink-ink: #A92F62;
+  --due: #C4472E; --due-soft: #FBE6DC; --soon: #6B4E00; --soon-soft: #FBEFC6; --ok: #2C6A40; --ok-soft: #E3F3E6;
+  --sun: #B8392F; --sat: #2F62A8; --today: #FFF0B8; --on-accent: #FFFFFF;
+  --week-a: #FFFDF8; --week-b: #FBF5EA; --week-th-a: #F7EEDF; --week-th-b: #F3E9DA; --week-sum: #F7EEDF;
+  --display: "Jua", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  --body: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  --gutter-l: max(16px, env(safe-area-inset-left, 0px)); --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+}
+.gr-adult { --c: var(--green); --c-soft: var(--green-soft); --c-ink: var(--green-ink); }
+.gr-high { --c: var(--blue); --c-soft: var(--blue-soft); --c-ink: var(--blue-ink); }
+.gr-junior { --c: var(--pink); --c-soft: var(--pink-soft); --c-ink: var(--pink-ink); }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--body); overflow: hidden; font-variant-numeric: tabular-nums; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { background: none; border: 0; padding: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.heart { color: var(--accent); }
+#app { height: 100%; display: flex; flex-direction: column; }
+.topbar { display: flex; align-items: center; gap: 4px; padding: 8px var(--gutter-r) 8px var(--gutter-l); padding-top: calc(8px + env(safe-area-inset-top, 0px)); }
+.topbar h1 { margin: 0; font: 400 22px/1.2 var(--display); flex: 1; min-width: 0; }
+.icon-btn { min-width: 44px; height: 44px; font-size: 22px; color: var(--muted); border-radius: 14px; }
+.text-btn { height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 14px; font-size: 14px; background: var(--surface); }
+.demo-note { display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 6px var(--gutter-r) 6px var(--gutter-l); background: var(--soon-soft); color: var(--soon); font-size: 13px; }
+.demo-note button { font-weight: 700; text-decoration: underline; min-height: 32px; white-space: nowrap; color: inherit; }
+main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.scroll { flex: 1; overflow-y: auto; padding: 4px var(--gutter-r) 24px var(--gutter-l); display: flex; flex-direction: column; gap: 22px; }
+
+/* 레슨표 */
+.grid-wrap { flex: 1; min-height: 0; overflow: auto; border-top: 1px solid var(--line); background: var(--surface); overscroll-behavior: contain; }
+table.grid { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
+.grid th, .grid td { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 0; background: var(--surface); }
+.grid thead th { position: sticky; z-index: 3; }
+.grid .row-group th { top: 0; height: 24px; font-size: 12px; font-weight: 700; text-align: left; padding-left: 8px; }
+.grid .row-group .group { background: var(--c); color: var(--on-accent); }
+.grid .row-group .group span { position: sticky; left: 76px; }
+.grid .row-names th { top: 24px; }
+.grid .corner { left: 0; z-index: 5; background: var(--sunken); width: 68px; min-width: 68px; font-size: 12px; color: var(--muted-strong); font-weight: 500; }
+.grid .row-group .corner { padding-left: 0; background: var(--sunken); }
+.grid .row-names .th-student { background: var(--c-soft); width: 96px; min-width: 96px; max-width: 96px; vertical-align: top; }
+.name-btn { display: flex; flex-direction: column; gap: 2px; align-items: center; justify-content: center; width: 100%; padding: 6px 2px 2px; }
+.name-btn .nm { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 0 3px; font-weight: 700; font-size: 14px; max-width: 100%; }
+.name-btn .nm-t { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.name-btn .cnt { flex: none; font-size: 12px; font-weight: 700; color: var(--c-ink); }
+.name-btn .sub { font-size: 12px; color: var(--muted-strong); white-space: nowrap; }
+.song-btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 42px; padding: 2px 4px 4px; font-size: 11px; line-height: 1.25; font-weight: 400; color: var(--fg); text-align: center; }
+.song-btn span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.song-btn.blank { color: var(--muted-strong); }
+.th-done > * { opacity: .62; }
+.pill { display: inline-block; font-size: 11px; font-weight: 700; line-height: 1; padding: 4px 7px; border-radius: 999px; white-space: nowrap; }
+.pill.due { background: var(--due); color: var(--on-accent); }
+.pill.soon { background: var(--soon-soft); color: var(--soon); }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+.pill.muted { background: var(--sunken); color: var(--muted-strong); }
+.th-student .pill.ok, .th-student .pill.muted { background: var(--surface); }
+.grid tbody th { position: sticky; left: 0; z-index: 2; background: var(--sunken); font-weight: 500; text-align: left; padding-left: 9px; white-space: nowrap; font-size: 14px; }
+.grid tbody th small { font-size: 12px; margin-left: 3px; color: inherit; }
+.grid tr.wk0 td { background: var(--week-a); } .grid tr.wk1 td { background: var(--week-b); }
+.grid tr.wk0 th { background: var(--week-th-a); } .grid tr.wk1 th { background: var(--week-th-b); }
+tr.d0 th, tr.d0 th small { color: var(--sun); }
+tr.d6 th, tr.d6 th small { color: var(--sat); }
+.grid tr.today th { background: var(--today); font-weight: 800; }
+.grid tr.today td { background: var(--today); }
+.grid tr.today th .heart { font-size: 11px; margin-left: 2px; }
+.cell { display: flex; align-items: center; justify-content: center; gap: 2px; width: 100%; height: 46px; }
+.mark { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; flex: none; min-width: 46px; height: 40px; padding: 0 4px; border-radius: 12px; font-weight: 800; font-size: 13px; line-height: 1.15; background: var(--c); color: var(--on-accent); }
+.mark small { font-size: 11px; font-weight: 700; }
+.mark.unpaid { background: var(--c-soft); color: var(--c-ink); box-shadow: inset 0 0 0 1.5px var(--c); }
+.plan { width: 7px; height: 7px; border-radius: 50%; background: var(--plan); }
+.coin { flex: none; font-size: 10px; font-weight: 800; color: var(--accent-ink); white-space: nowrap; line-height: 1; }
+/* 주별 요약: 버튼이 없어 눌러도 기록되지 않는다 */
+.grid tr.week-sum td, .grid tr.week-sum th { background: var(--week-sum); font-size: 11px; line-height: 1.25; padding-block: 3px; }
+.grid tr.week-sum td { text-align: center; white-space: nowrap; font-weight: 700; color: var(--c-ink); }
+.grid tr.week-sum th { font-weight: 700; padding-left: 6px; color: var(--muted-strong); }
+.wk-line { display: block; font-weight: 600; }
+.wk-pay { display: block; color: var(--accent-ink); }
+.settled { color: var(--accent-ink); font-weight: 700; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 7px var(--gutter-r) 7px var(--gutter-l); font-size: 12px; color: var(--muted); align-items: center; }
+.legend i { display: inline-block; width: 14px; height: 14px; border-radius: 5px; vertical-align: -2px; margin-right: 4px; background: var(--c); }
+.legend i.soft { background: var(--sunken); box-shadow: inset 0 0 0 1.5px var(--muted); }
+.empty { padding: 36px 16px; text-align: center; color: var(--muted); display: flex; flex-direction: column; gap: 14px; align-items: center; }
+
+/* 하단 탭 */
+nav.tabs { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); background: var(--surface); padding-bottom: env(safe-area-inset-bottom, 0px); }
+nav.tabs button { height: 52px; font-size: 14px; color: var(--muted); position: relative; }
+nav.tabs button.on { color: var(--accent-ink); font-weight: 800; }
+nav.tabs button.on::before { content: "\2665\FE0E"; position: absolute; top: 2px; left: 0; right: 0; text-align: center; font-size: 10px; line-height: 1; font-weight: 400; color: var(--accent); }
+nav.tabs .count { display: inline-block; min-width: 18px; height: 18px; line-height: 18px; border-radius: 9px; background: var(--due); color: var(--on-accent); font-size: 11px; font-weight: 800; margin-left: 3px; padding: 0 4px; }
+
+/* 수납·학생·백업 */
+h2 { margin: 0 0 8px; font: 400 16px/1.35 var(--display); }
+.sum { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-block: 10px; border-bottom: 1px solid var(--line); }
+.sum b { display: block; font: 400 26px/1.2 var(--display); }
+.sum span { font-size: 13px; color: var(--muted); }
+.list { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.row { display: flex; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); min-height: 58px; width: 100%; text-align: left; }
+.row .grow { flex: 1; min-width: 0; }
+.row .ttl { font-weight: 700; }
+.row .desc { font-size: 13px; color: var(--muted); }
+.tag { width: 8px; align-self: stretch; border-radius: 4px; flex: none; background: var(--c, var(--line)); }
+.tag.done { background: var(--line); }
+.primary { min-height: 44px; padding: 0 18px; border-radius: 16px; background: var(--accent); color: var(--on-accent); font-weight: 700; white-space: nowrap; }
+.primary.small { min-height: 38px; padding: 0 14px; border-radius: 14px; font-size: 14px; }
+.secondary { min-height: 44px; padding: 0 14px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; }
+.danger { color: var(--due); }
+.mini-wrap { overflow-x: auto; }
+table.mini { border-collapse: collapse; width: 100%; font-size: 14px; }
+table.mini th, table.mini td { border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: center; white-space: nowrap; }
+table.mini th:first-child, table.mini td:first-child { text-align: left; font-weight: 700; padding-left: 0; }
+table.mini thead th { font-size: 12px; color: var(--muted); font-weight: 600; }
+.paid-dot { display: block; font-size: 11px; font-weight: 700; color: var(--ok); } .paid-dot.miss { color: var(--due); }
+.note { font-size: 13px; color: var(--muted); margin: 0; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.sec-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; } .sec-head h2 { margin: 0; }
+
+/* 아래 시트 */
+.backdrop { position: fixed; inset: 0; background: rgb(74 54 64 / .42); z-index: 20; display: flex; align-items: flex-end; justify-content: center; }
+.sheet { background: var(--surface); width: 100%; max-width: 560px; max-height: 90%; overflow-y: auto; border-radius: 24px 24px 0 0; padding: 14px var(--gutter-r) calc(18px + env(safe-area-inset-bottom, 0px)) var(--gutter-l); display: flex; flex-direction: column; gap: 14px; animation: rise .18s ease-out; }
+@keyframes rise { from { transform: translateY(24px); } }
+@media (prefers-reduced-motion: reduce) { .sheet { animation: none; } }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; position: sticky; top: -14px; background: var(--surface); margin: -14px 0 0; padding-block: 12px 6px; z-index: 1; }
+.sheet-head h2 { margin: 0; font: 400 20px/1.25 var(--display); min-width: 0; }
+.field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.field > label, .field > .lb { font-size: 13px; font-weight: 700; color: var(--muted); }
+.field input, .field textarea, .field select { width: 100%; min-width: 0; font-size: 16px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg button { min-height: 42px; min-width: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); }
+.seg button.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 700; }
+.seg.wide button { flex: 1; }
+.err { color: var(--due); font-size: 13px; font-weight: 700; margin: 0; }
+/* 정간: 한 묶음의 진행을 칸으로 보여 준다. 받지 못한 회차가 묶음을 넘으면 칸이 늘어난다. */
+.jeonggan { display: grid; grid-template-columns: repeat(auto-fill, 30px); gap: 3px; }
+.jeonggan i { display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 9px; font-style: normal; font-size: 12px; color: var(--muted); }
+.jeonggan i.fill { background: var(--c); border-color: var(--c); color: var(--on-accent); font-weight: 800; }
+.jeonggan i.fill.unpaid { background: var(--c-soft); color: var(--c-ink); box-shadow: inset 0 0 0 .5px var(--c); }
+.facts { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0; font-size: 14px; }
+.facts dt { color: var(--muted); } .facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.tel { color: var(--accent-ink); font-weight: 600; -webkit-user-select: text; user-select: text; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(66px + env(safe-area-inset-bottom, 0px)); z-index: 30; display: flex; gap: 14px; align-items: center; background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 16px; font-size: 14px; width: max-content; max-width: calc(100% - 32px); }
+.toast button { color: inherit; font-weight: 800; text-decoration: underline; min-height: 28px; white-space: nowrap; }
+#restore-file { max-width: 100%; }
+.backup-text { width: 100%; height: 110px; font-size: 12px; font-family: ui-monospace, monospace; padding: 8px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="overlay"></div>
+<!-- logic:start -->
+<script src="logic.js"></script>
+<!-- logic:end -->
+<script>
+const L = window.LessonLogic;
+const KEY = 'lessonbook.v1';
+const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const HEART = '♥︎'; // 아이폰에서 이모지로 바뀌지 않게 텍스트 표시를 지정한다
+const heart = () => `<span class="heart" aria-hidden="true">${HEART}</span>`;
+const man = (n) => `${L.manText(n)}만`;
+const won = (n) => `${L.manText(n)}만원`;
+const gradeClass = (s) => `gr-${L.gradeOf(s)}`;
+const gradeLabel = (s) => L.GRADES.find((g) => g.key === L.gradeOf(s)).label;
+function telLink(value) {
+  const text = String(value || '').trim();
+  if (!text) return '-';
+  const digits = text.replace(/[^0-9+]/g, '');
+  return digits ? `<a class="tel" href="tel:${digits}">${esc(text)}</a>` : esc(text);
+}
+const mdLabel = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`;
+const ymLabel = (ym) => `${ym.slice(0, 4)}년 ${Number(ym.slice(5))}월`;
+
+/* ---------- 저장: localStorage를 쓰고 IndexedDB에 사본을 둔다. 어느 쪽이 비어도 다른 쪽에서 되살린다. ---------- */
+const blank = () => ({ version: 2, students: [], lessons: [], payments: [], demo: false, lastBackup: null });
+let data = blank();
+let saveFailed = false;
+
+function idb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('lessonbook', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('kv');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+    req.onblocked = () => reject(new Error('blocked'));
+  });
+}
+// 응답하지 않으면 사본을 건드리지 않는다. 그 안에 실제 기록이 있을 수 있어 덮어쓰면 안 된다.
+let idbStuck = false;
+async function idbPut(text) {
+  if (idbStuck) return;
+  try {
+    const db = await idb();
+    const tx = db.transaction('kv', 'readwrite');
+    tx.objectStore('kv').put(text, KEY);
+    tx.oncomplete = tx.onabort = () => db.close();
+  } catch (e) { /* 사본 저장 실패는 본 저장에 영향을 주지 않는다 */ }
+}
+async function idbGet() {
+  const read = (async () => {
+    try {
+      const db = await idb();
+      return await new Promise((resolve) => {
+        const r = db.transaction('kv').objectStore('kv').get(KEY);
+        r.onsuccess = () => { db.close(); resolve(r.result || null); };
+        r.onerror = () => { db.close(); resolve(null); };
+      });
+    } catch (e) { return null; }
+  })();
+  // 저장소가 멈춰도 앱은 열려야 한다. 빈 화면으로 남지 않게 기다리는 시간을 정한다.
+  let timer;
+  const stuck = new Promise((resolve) => { timer = setTimeout(() => { idbStuck = true; resolve(null); }, 1500); });
+  return Promise.race([read.then((v) => { clearTimeout(timer); return v; }), stuck]);
+}
+function save() {
+  const text = JSON.stringify(data);
+  try { localStorage.setItem(KEY, text); saveFailed = false; } catch (e) { saveFailed = true; }
+  idbPut(text);
+}
+async function load() {
+  let text = null;
+  try { text = localStorage.getItem(KEY); } catch (e) { /* 차단된 환경 */ }
+  if (!text) text = await idbGet();
+  if (text) {
+    try {
+      const parsed = JSON.parse(text);
+      if (L.validateBackup(parsed)) {
+        // 변환 전 원본을 한 번 남겨 둔다. 실제 기록은 이 휴대폰에만 있어 잘못되면 복구할 수 없다.
+        if ((Number(parsed.version) || 1) < 2) { try { localStorage.setItem(`${KEY}.before-v2`, text); } catch (e) { /* 공간 부족은 변환을 막지 않는다 */ } }
+        return { ...blank(), ...L.migrateData(parsed, seedDemo) };
+      }
+    } catch (e) { /* 깨진 값은 무시하고 예시로 시작한다 */ }
+  }
+  return seedDemo();
+}
+
+function seedDemo() {
+  const today = L.todayStr();
+  const thisYm = L.ymOf(today);
+  const lm = L.shiftMonth(thisYm, -1);
+  const mm = L.shiftMonth(thisYm, -2);
+  const d = blank();
+  d.demo = true;
+  const add = (s) => { const st = { id: uid(), active: true, demoSeed: true, joinedAt: `${mm}-01`, ...s }; d.students.push(st); return st; };
+  const piled = add({ name: '정민아', grade: 'adult', song: '가야금 산조 진양조', studentPhone: '010-0000-0001', parentPhone: '', gender: '여', age: 24, weekly: 2, days: [1, 4], note: '직장인. 저녁 레슨', billing: 'session', packageCount: 10, packageFee: 600000, payTiming: 'post', priorDone: 0 });
+  add({ name: '오세진', grade: 'adult', song: '춘향가 사랑가', studentPhone: '010-0000-0002', parentPhone: '', gender: '남', age: 31, weekly: 1, days: [3], note: '판소리 취미반', billing: 'monthly', monthlyFee: 600000, payDay: 1 });
+  const hs = add({ name: '이도윤', grade: 'high', song: '대금 청성곡', studentPhone: '010-0000-0003', parentPhone: '010-0000-0004', gender: '남', age: 17, weekly: 1, days: [2], note: '입시 준비', billing: 'session', packageCount: 8, packageFee: 600000, payTiming: 'pre', priorDone: 0 });
+  add({ name: '최지호', grade: 'high', song: '흥보가 제비노정기', studentPhone: '010-0000-0005', parentPhone: '010-0000-0006', gender: '남', age: 18, weekly: 2, days: [1, 5], note: '콩쿠르 준비', billing: 'monthly', monthlyFee: 600000, payDay: 1 });
+  const jr = add({ name: '김서연', grade: 'junior', song: '해금 도드리', studentPhone: '', parentPhone: '010-0000-0007', gender: '여', age: 12, weekly: 1, days: [2], note: '산조 입문', billing: 'session', packageCount: 10, packageFee: 500000, payTiming: 'pre', priorDone: 0 });
+  const unpaidMonth = add({ name: '박하린', grade: 'junior', song: '', studentPhone: '', parentPhone: '010-0000-0008', gender: '여', age: 10, weekly: 1, days: [6], note: '집중 시간 짧음', billing: 'monthly', monthlyFee: 500000, payDay: 1 });
+  [mm, lm, thisYm].forEach((month) => {
+    L.daysInMonth(month).forEach(({ date, weekday }) => {
+      if (date > today) return;
+      d.students.forEach((s) => {
+        if (s.days.includes(weekday)) d.lessons.push({ id: uid(), studentId: s.id, date });
+      });
+    });
+  });
+  // 정민아는 11/10까지 쌓인 모습을 보여 주도록 최근 11회만 남긴다.
+  const piledLessons = d.lessons.filter((l) => l.studentId === piled.id).slice(-11);
+  d.lessons = d.lessons.filter((l) => l.studentId !== piled.id).concat(piledLessons);
+  d.payments.push({ id: uid(), studentId: hs.id, date: `${mm}-01`, amount: 600000, count: 8 });
+  d.payments.push({ id: uid(), studentId: jr.id, date: `${lm}-10`, amount: 500000, count: 10 });
+  d.students.filter((s) => s.billing === 'monthly').forEach((s) => {
+    [mm, lm, thisYm].forEach((month) => {
+      if (month === thisYm && s === unpaidMonth) return; // 이달 미수납 예시
+      d.payments.push({ id: uid(), studentId: s.id, date: `${month}-01`, month, amount: s.monthlyFee });
+    });
+  });
+  return d;
+}
+
+/* ---------- 상태 ---------- */
+let tab = 'grid';
+let ym = L.ymOf(L.todayStr());
+let sheet = null;   // { type, ... }
+let draft = null;
+let toastTimer = null;
+let scrollToToday = true;
+
+const studentById = (id) => data.students.find((s) => s.id === id);
+const sessionOf = (s) => L.sessionStatus(data, s);
+const monthlyOf = (s, month = ym) => L.monthlyStatus(data, s, month);
+
+function dueList() {
+  const out = [];
+  data.students.filter((s) => s.active !== false).forEach((s) => {
+    if (s.billing === 'session') {
+      const st = sessionOf(s);
+      if (st.state === 'due') {
+        const extra = s.payTiming === 'post' || !st.unpaidCount ? '' : ` · 미수납 ${st.unpaidCount}회 ${won(st.unpaidAmount)}`;
+        const main = s.payTiming === 'post' ? `(${st.pos}/${st.size}) ${st.unpaidCount}회 ${won(st.unpaidAmount)} 받을 차례` : `${st.unpaidCount > s.packageCount ? `전체 ${st.unpaidCount}회 ${won(st.dueAmount)}` : `${s.packageCount}회 ${won(st.dueAmount)}`} 받을 차례`;
+        out.push({ s, state: 'due', amount: st.dueAmount, desc: main + (st.unpaidCount > s.packageCount ? '' : extra) });
+      } else if (st.state === 'soon') {
+        out.push({ s, state: 'soon', amount: 0, desc: `${st.left}회 후 ${won(s.packageFee)}` });
+      }
+    } else {
+      // 이번 달만 보면 지난달 미수납을 놓치므로 등록한 달부터 훑는다.
+      const thisYm = L.ymOf(L.todayStr());
+      for (let m = L.ymOf(s.joinedAt || L.todayStr()); m <= thisYm; m = L.shiftMonth(m, 1)) {
+        const st = monthlyOf(s, m);
+        if (st.state === 'due') out.push({ s, state: 'due', month: m, amount: Number(s.monthlyFee) || 0, desc: `${ymLabel(m)}분 ${won(s.monthlyFee)} · 납부일 ${Number(st.dueDate.slice(8))}일` });
+      }
+    }
+  });
+  return out.sort((a, b) => (a.state === 'due' ? 0 : 1) - (b.state === 'due' ? 0 : 1));
+}
+
+/* ---------- 레슨표 ---------- */
+function headCell(s) {
+  const done = s.active === false;
+  const open = `<th class="th-student ${gradeClass(s)} ${done ? 'th-done' : ''}"><button class="name-btn" data-act="open-student" data-id="${s.id}">`;
+  const song = String(s.song || '').trim();
+  const songBtn = `<button class="song-btn ${song ? '' : 'blank'}" data-act="open-song" data-id="${s.id}" aria-label="${esc(s.name)} 곡명 ${song ? `${esc(song)}, 눌러서 바꾸기` : '입력'}"><span>${song ? esc(song) : '♪ 곡명'}</span></button>`;
+  if (s.billing === 'session') {
+    const st = sessionOf(s);
+    const pill = done ? '<span class="pill muted">졸업</span>' : `<span class="pill ${st.state}">${esc(st.label)}</span>`;
+    return `${open}<span class="nm"><span class="nm-t">${esc(s.name)}</span><span class="cnt">(${st.pos}/${st.size})</span></span><span class="sub">${st.settled ? `<span class="settled">${HEART} 정산 완료</span>` : `누적 ${won(st.accrued)}`}</span>${pill}</button>${songBtn}</th>`;
+  }
+  const st = monthlyOf(s);
+  const map = { paid: ['ok', '수납 완료'], due: ['due', '미수납'], upcoming: ['muted', `${Number(st.dueDate.slice(8))}일 납부`], none: ['muted', '해당 없음'] };
+  const [cls, text] = done ? ['muted', '졸업'] : map[st.state];
+  return `${open}<span class="nm"><span class="nm-t">${esc(s.name)}</span></span><span class="sub">이달 ${st.count}회</span><span class="pill ${cls}">${text}</span></button>${songBtn}</th>`;
+}
+
+function renderGrid() {
+  const groups = L.groupByGrade(L.visibleStudents(data, ym));
+  const ordered = groups.flatMap((g) => g.students);
+  if (!ordered.length) {
+    return `<div class="empty"><p class="note">${heart()} ${ymLabel(ym)}에 표시할 학생이 없습니다. 학생을 추가하면 이곳에 이름이 나타납니다.</p><button class="primary" data-act="add-student">학생 추가</button></div>`;
+  }
+  const numbers = {};
+  ordered.forEach((s) => { numbers[s.id] = s.billing === 'session' ? sessionOf(s).numbers : monthlyOf(s).numbers; });
+  const payDays = {};
+  L.paymentsInMonth(data, ym).forEach((p) => { payDays[`${p.studentId}|${p.date}`] = true; });
+  const today = L.todayStr();
+  const rows = L.weeksInMonth(ym).map((week, wi) => {
+    const zebra = `wk${wi % 2}`;
+    const dayRows = week.days.map(({ date, day, weekday }) => {
+      const cells = ordered.map((s) => {
+        const n = numbers[s.id][date];
+        let inner = '';
+        if (n && s.billing === 'session') inner = `<span class="mark ${n.paid ? '' : 'unpaid'}">(${n.pos}/${n.size})<small>${man(n.amount)}</small></span>`;
+        else if (n) inner = `<span class="mark">${n.pos}회</span>`;
+        else if (s.active !== false && (s.days || []).includes(weekday)) inner = '<span class="plan"></span>';
+        const coin = payDays[`${s.id}|${date}`] ? `<span class="coin">${HEART} 수납</span>` : '';
+        const money = n && s.billing === 'session' ? ` 누적 ${won(n.amount)}${n.paid ? '' : ' 미수납'}` : '';
+        const label = `${s.name} ${Number(date.slice(5, 7))}월 ${day}일 ${n ? `${n.pos}번째 레슨 기록됨${money}, 누르면 지움` : '레슨 기록'}`;
+        return `<td class="${gradeClass(s)}"><button class="cell" aria-label="${esc(label)}" data-act="toggle" data-id="${s.id}" data-date="${date}">${inner}${coin}</button></td>`;
+      }).join('');
+      const isToday = date === today;
+      return `<tr class="${zebra} d${weekday} ${isToday ? 'today' : ''}" ${isToday ? 'id="today-row"' : ''}><th scope="row">${day}<small>${WEEK[weekday]}</small>${isToday ? heart() : ''}</th>${cells}</tr>`;
+    }).join('');
+    const totals = L.weekTotals(data, week.dates);
+    const sumCells = ordered.map((s) => {
+      const r = L.weekSummary(numbers[s.id], week.dates);
+      const text = !r.count ? '' : s.billing === 'session' ? `${r.count}회 / ${man(r.amount)}` : `${r.count}회`;
+      return `<td class="${gradeClass(s)}">${text}</td>`;
+    }).join('');
+    return `${dayRows}<tr class="week-sum"><th scope="row">${week.n}주 ${totals.lessons}회<span class="wk-line">회차 ${man(L.weekSessionValue(data, week.dates))}</span>${totals.received ? `<span class="wk-pay">${HEART} ${man(totals.received)}</span>` : ''}</th>${sumCells}</tr>`;
+  }).join('');
+  const groupCells = groups.map((g) => `<th class="group gr-${g.key}" colspan="${g.students.length}"><span>${g.label}</span></th>`).join('');
+  return `<div class="grid-wrap" id="grid-wrap"><table class="grid"><thead>
+    <tr class="row-group"><th class="corner"></th>${groupCells}</tr>
+    <tr class="row-names"><th class="corner">날짜</th>${ordered.map(headCell).join('')}</tr>
+  </thead><tbody>${rows}</tbody></table></div>
+  <div class="legend">${L.GRADES.map((g) => `<span class="gr-${g.key}"><i></i>${g.label}</span>`).join('')}<span><i class="soft"></i>안 받은 회차</span></div>`;
+}
+
+/* ---------- 수납 ---------- */
+function renderMoney() {
+  const pays = L.paymentsInMonth(data, ym);
+  const total = pays.reduce((a, p) => a + (Number(p.amount) || 0), 0);
+  const due = dueList();
+  const dueNow = due.filter((d) => d.state === 'due');
+  const dueTotal = dueNow.reduce((a, d) => a + d.amount, 0);
+  const monthly = data.students.filter((s) => s.billing !== 'session' && (s.active !== false || data.lessons.some((l) => l.studentId === s.id)));
+  const months = [-3, -2, -1, 0].map((n) => L.shiftMonth(ym, n));
+  const monthlyTable = monthly.length ? `<div class="mini-wrap"><table class="mini"><thead><tr><th>이름</th>${months.map((m) => `<th>${Number(m.slice(5))}월</th>`).join('')}</tr></thead><tbody>
+    ${monthly.map((s) => `<tr><td>${esc(s.name)}</td>${months.map((m) => {
+      const st = monthlyOf(s, m);
+      const tagText = st.state === 'paid' ? `<span class="paid-dot">${mdLabel(st.payment.date)} 수납</span>` : st.state === 'due' ? '<span class="paid-dot miss">미수납</span>' : '';
+      return `<td>${st.count}회${tagText}</td>`;
+    }).join('')}</tr>`).join('')}
+  </tbody></table></div>` : '<p class="note">월정액 학생이 아직 없습니다.</p>';
+  return `<div class="scroll">
+    <div class="sum"><div><b>${won(total)}</b><span>${Number(ym.slice(5))}월에 받은 금액</span></div><div><b>${won(dueTotal)}</b><span>지금 받을 금액 ${dueNow.length}건</span></div></div>
+    <section><h2>받을 차례</h2>${due.length ? `<div class="list">${due.map((d) => `
+      <div class="row"><span class="tag ${gradeClass(d.s)}"></span>
+        <button class="grow" style="text-align:left" data-act="open-student" data-id="${d.s.id}"><div class="ttl">${esc(d.s.name)} <span class="pill ${d.state}">${d.state === 'due' ? '수납 필요' : '곧 수납'}</span></div><div class="desc">${esc(d.desc)}</div></button>
+        <button class="primary small" data-act="open-pay" data-id="${d.s.id}" ${d.month ? `data-month="${d.month}"` : ''}>받음</button></div>`).join('')}</div>` : '<p class="note">지금 받을 레슨비가 없습니다.</p>'}</section>
+    <section><h2>월정액 달별 레슨 횟수</h2>${monthlyTable}</section>
+    <section><h2>${Number(ym.slice(5))}월 수납 내역</h2>${pays.length ? `<div class="list">${pays.map((p) => {
+      const s = studentById(p.studentId);
+      return `<div class="row"><span class="tag ${s ? gradeClass(s) : 'done'}"></span><div class="grow"><div class="ttl">${esc(s ? s.name : '삭제된 학생')} · ${won(p.amount)}</div><div class="desc">${mdLabel(p.date)} 받음 · ${p.count ? `${p.count}회분` : `${Number((p.month || '').slice(5))}월분`}</div></div></div>`;
+    }).join('')}</div>` : '<p class="note">이 달에 받은 레슨비가 없습니다.</p>'}</section>
+  </div>`;
+}
+
+/* ---------- 학생 ---------- */
+function studentRow(s) {
+  let desc;
+  if (s.active === false) desc = `${s.graduatedAt ? mdLabel(s.graduatedAt) + ' 졸업 · ' : ''}누적 ${L.lessonsOf(data, s.id).length}회`;
+  else if (s.billing === 'session') { const st = sessionOf(s); desc = `${s.packageCount}회 ${won(s.packageFee)} · (${st.pos}/${st.size}) ${st.settled ? '정산 완료' : `누적 ${won(st.accrued)}`} · ${st.label}`; }
+  else desc = `매월 ${s.payDay || 1}일 ${won(s.monthlyFee)} · 이달 ${monthlyOf(s, L.ymOf(L.todayStr())).count}회`;
+  const profile = [gradeLabel(s), s.gender, s.age ? `${s.age}세` : '', s.weekly ? `주 ${s.weekly}회` : ''].filter(Boolean).join(' · ');
+  const song = String(s.song || '').trim();
+  return `<button class="row" data-act="open-student" data-id="${s.id}"><span class="tag ${s.active === false ? 'done' : gradeClass(s)}"></span><span class="grow"><div class="ttl">${esc(s.name)} <span class="desc" style="font-weight:400">${esc(profile)}</span></div>${song ? `<div class="desc">♪ ${esc(song)}</div>` : ''}<div class="desc">${esc(desc)}</div></span></button>`;
+}
+function renderStudents() {
+  const active = data.students.filter((s) => s.active !== false);
+  const gone = data.students.filter((s) => s.active === false);
+  return `<div class="scroll">
+    <div class="sec-head" style="margin:6px 0 -10px"><h2>재학생 ${active.length}명</h2><button class="primary small" data-act="add-student">학생 추가</button></div>
+    ${active.length ? `<div class="list">${active.map(studentRow).join('')}</div>` : `<p class="note">${heart()} 학생을 추가하면 레슨표에 이름이 생깁니다.</p>`}
+    ${gone.length ? `<section><h2>졸업생 ${gone.length}명</h2><div class="list">${gone.map(studentRow).join('')}</div></section>` : ''}
+  </div>`;
+}
+
+/* ---------- 백업 ---------- */
+function backupText() { return JSON.stringify({ ...data, exportedAt: new Date().toISOString() }); }
+function renderBackup() {
+  const days = data.lastBackup ? Math.floor((Date.now() - new Date(data.lastBackup)) / 86400000) : null;
+  return `<div class="scroll">
+    <section><h2>저장 상태</h2>
+      <p class="note">입력한 내용은 누를 때마다 이 기기에 바로 저장됩니다. 다른 사람에게 전송되지 않습니다.${saveFailed ? ' <b class="danger">지금은 저장에 실패하고 있습니다. 파일로 백업해 주세요.</b>' : ''}</p>
+      <p class="note">마지막 백업: ${data.lastBackup ? `${days === 0 ? '오늘' : days + '일 전'}` : '아직 없음'}</p></section>
+    <section><h2>백업 만들기</h2>
+      <p class="note" style="margin-bottom:8px">휴대폰을 바꾸거나 사파리 기록을 지우면 기록이 사라질 수 있습니다. 한 달에 한 번 파일로 저장해 두세요.</p>
+      <div class="actions"><button class="primary" data-act="backup-file">파일로 저장</button><button class="secondary" data-act="backup-copy">내용 복사</button></div>
+      <textarea id="backup-out" class="backup-text" style="margin-top:8px" readonly hidden aria-label="백업 내용"></textarea></section>
+    <section><h2>백업 불러오기</h2>
+      <p class="note" style="margin-bottom:8px">지금 기록을 백업 파일의 내용으로 바꿉니다.</p>
+      <input id="restore-file" type="file" accept="application/json,.json,.txt" aria-label="백업 파일 선택"></section>
+    <section><h2>모두 지우기</h2><button class="secondary danger" data-act="ask-wipe">전체 기록 지우기</button></section>
+  </div>`;
+}
+
+/* ---------- 시트 ---------- */
+function renderStudentSheet(s) {
+  const lessons = L.lessonsOf(data, s.id);
+  const pays = L.paymentsOf(data, s.id).reverse();
+  const facts = [
+    ['분류', gradeLabel(s)],
+    ['곡명', s.song || '-'],
+    ['정보', [s.gender, s.age ? `${s.age}세` : '', s.weekly ? `주 ${s.weekly}회` : ''].filter(Boolean).join(' · ') || '-'],
+    ['요일', (s.days || []).length ? [...s.days].sort().map((d) => WEEK[d]).join(' ') : '-'],
+    ['특징', s.note || '-'],
+    ['학생 연락처', telLink(s.studentPhone), true],
+    ['보호자 연락처', telLink(s.parentPhone), true],
+  ];
+  let status;
+  if (s.billing === 'session') {
+    const st = sessionOf(s);
+    const cells = Array.from({ length: Math.max(st.size, st.pos) }, (_, i) => `<i class="${i < st.pos ? `fill ${st.unpaidCount ? 'unpaid' : ''}` : ''}">${i + 1}</i>`).join('');
+    facts.push(['조건', `${s.packageCount}회 ${won(s.packageFee)} · ${s.payTiming === 'post' ? '끝나고 받기' : '먼저 받기'}`]);
+    facts.push(['누적', `${st.done}회 · 받은 묶음 ${st.paidPackages}개`]);
+    facts.push(['지금까지', `(${st.pos}/${st.size}) ${won(st.accrued)}`]);
+    if (st.unpaidCount) facts.push(['미수납', `${st.unpaidCount}회 ${won(st.unpaidAmount)}`]);
+    status = `<div class="sec-head"><h2>${st.cycle}번째 묶음 ${st.pos}/${st.size}회</h2><span class="pill ${st.state}">${esc(st.label)}</span></div><div class="jeonggan ${gradeClass(s)}" aria-hidden="true">${cells}</div>`;
+  } else {
+    const thisYm = L.ymOf(L.todayStr());
+    const st = monthlyOf(s, thisYm);
+    facts.push(['조건', `매월 ${s.payDay || 1}일 ${won(s.monthlyFee)}`]);
+    const months = [-5, -4, -3, -2, -1, 0].map((n) => L.shiftMonth(thisYm, n));
+    status = `<div class="sec-head"><h2>이번 달 ${st.count}회</h2><span class="pill ${st.state === 'paid' ? 'ok' : st.state === 'due' ? 'due' : 'muted'}">${st.state === 'paid' ? `${mdLabel(st.payment.date)} 수납` : st.state === 'due' ? '미수납' : `${Number(st.dueDate.slice(8))}일 납부`}</span></div>
+      <div class="mini-wrap"><table class="mini"><thead><tr>${months.map((m) => `<th>${Number(m.slice(5))}월</th>`).join('')}</tr></thead><tbody><tr>${months.map((m) => `<td style="text-align:center;font-weight:700;padding-left:6px">${monthlyOf(s, m).count}</td>`).join('')}</tr></tbody></table></div>`;
+  }
+  const recent = lessons.slice(-6).reverse().map((l) => mdLabel(l.date)).join(', ');
+  return `<div class="sheet-head"><h2>${esc(s.name)}</h2><button class="icon-btn" data-act="close" aria-label="닫기">✕</button></div>
+    ${status}
+    ${s.active !== false ? `<button class="primary" data-act="open-pay" data-id="${s.id}">레슨비 받음 기록</button>` : ''}
+    <dl class="facts">${facts.map(([k, v, isHtml]) => `<dt>${k}</dt><dd>${isHtml ? v : esc(v)}</dd>`).join('')}<dt>최근</dt><dd>${esc(recent || '기록 없음')}</dd></dl>
+    <section><h2>수납 내역</h2>${pays.length ? `<div class="list">${pays.slice(0, 12).map((p) => `<div class="row" style="min-height:48px"><div class="grow"><div class="ttl">${won(p.amount)}</div><div class="desc">${mdLabel(p.date)} 받음 · ${p.count ? `${p.count}회분` : `${Number((p.month || '').slice(5))}월분`}</div></div><button class="secondary danger" data-act="del-pay" data-id="${p.id}">지우기</button></div>`).join('')}</div>` : '<p class="note">받은 기록이 없습니다.</p>'}</section>
+    <div class="actions"><button class="secondary" data-act="edit-student" data-id="${s.id}">정보 수정</button>
+    ${s.active === false ? `<button class="secondary" data-act="restore" data-id="${s.id}">재학생으로 되돌리기</button><button class="secondary danger" data-act="ask-delete" data-id="${s.id}">완전히 삭제</button>` : `<button class="secondary" data-act="ask-graduate" data-id="${s.id}">졸업 처리</button>`}</div>`;
+}
+
+function seg(field, options, value) {
+  return `<div class="seg ${options.length <= 3 ? 'wide' : ''}">${options.map(([v, t]) => `<button type="button" class="${String(value) === String(v) ? 'on' : ''}" data-act="seg" data-field="${field}" data-value="${esc(v)}">${esc(t)}</button>`).join('')}</div>`;
+}
+function renderFormSheet() {
+  const d = draft;
+  const billing = d.billing === 'session' ? `
+    <div class="field"><span class="lb">자주 쓰는 조건</span><div class="seg"><button type="button" data-act="preset" data-c="8" data-f="60">8회 60만원</button><button type="button" data-act="preset" data-c="10" data-f="50">10회 50만원</button><button type="button" data-act="preset" data-c="10" data-f="60">10회 60만원</button></div></div>
+    <div class="two"><div class="field"><label for="f-pc">묶음 횟수</label><input id="f-pc" inputmode="numeric" data-bind="packageCount" value="${esc(d.packageCount)}"></div>
+    <div class="field"><label for="f-pf">금액 (만원)</label><input id="f-pf" inputmode="decimal" data-bind="feeMan" value="${esc(d.feeMan)}"></div></div>
+    <div class="field"><span class="lb">언제 받나요</span>${seg('payTiming', [['pre', '먼저 받고 시작'], ['post', '끝나고 받기']], d.payTiming)}</div>
+    <div class="field"><label for="f-prior">이번 묶음에서 이미 한 횟수</label><input id="f-prior" inputmode="numeric" data-bind="priorDone" value="${esc(d.priorDone)}"><p class="note">이미 받은 묶음은 레슨비 받음으로 기록해 주세요</p></div>` : `
+    <div class="two"><div class="field"><label for="f-mf">월 금액 (만원)</label><input id="f-mf" inputmode="decimal" data-bind="feeMan" value="${esc(d.feeMan)}"></div>
+    <div class="field"><label for="f-pd">납부일 (매월)</label><input id="f-pd" inputmode="numeric" data-bind="payDay" value="${esc(d.payDay)}"></div></div>`;
+  return `<div class="sheet-head"><h2>${d.id ? '학생 정보 수정' : '학생 추가'}</h2><button class="icon-btn" data-act="close" aria-label="닫기">✕</button></div>
+    <div class="field"><label for="f-name">이름</label><input id="f-name" data-bind="name" value="${esc(d.name)}" autocomplete="off"></div>
+    <div class="field"><span class="lb">학생 분류 (필수)</span>${seg('grade', L.GRADES.map((g) => [g.key, g.label]), d.grade)}</div>
+    <div class="field"><label for="f-song">현재 곡명</label><input id="f-song" data-bind="song" value="${esc(d.song)}" autocomplete="off"></div>
+    <div class="two"><div class="field"><span class="lb">성별</span>${seg('gender', [['여', '여'], ['남', '남']], d.gender)}</div>
+    <div class="field"><label for="f-age">나이</label><input id="f-age" inputmode="numeric" data-bind="age" value="${esc(d.age)}"></div></div>
+    <div class="field"><span class="lb">주당 레슨</span>${seg('weekly', [[1, '1회'], [2, '2회'], [3, '3회']], d.weekly)}</div>
+    <div class="field"><span class="lb">레슨 요일 (선택)</span><div class="seg">${WEEK.map((w, i) => `<button type="button" class="${d.days.includes(i) ? 'on' : ''}" data-act="day" data-day="${i}">${w}</button>`).join('')}</div></div>
+    <div class="field"><label for="f-note">특징 메모</label><textarea id="f-note" rows="2" data-bind="note">${esc(d.note)}</textarea></div>
+    <div class="two"><div class="field"><label for="f-sp">학생 연락처 (선택)</label><input id="f-sp" type="tel" autocomplete="off" data-bind="studentPhone" value="${esc(d.studentPhone)}"></div>
+    <div class="field"><label for="f-pp">보호자 연락처 (선택)</label><input id="f-pp" type="tel" autocomplete="off" data-bind="parentPhone" value="${esc(d.parentPhone)}"></div></div>
+    <div class="field"><span class="lb">레슨비 방식</span>${seg('billing', [['session', '회차제'], ['monthly', '월정액']], d.billing)}</div>
+    ${billing}
+    ${d.error ? `<p class="err">${esc(d.error)}</p>` : ''}
+    <button class="primary" data-act="save-student">저장</button>`;
+}
+
+function renderSongSheet() {
+  const s = studentById(draft.studentId);
+  return `<div class="sheet-head"><h2>${esc(s.name)} 곡명</h2><button class="icon-btn" data-act="close" aria-label="닫기">✕</button></div>
+    <div class="field"><label for="f-song-only">지금 배우는 곡</label><input id="f-song-only" data-bind="song" value="${esc(draft.song)}" autocomplete="off" placeholder="예: 가야금 산조 진양조"></div>
+    <button class="primary" data-act="save-song">저장</button>`;
+}
+
+function renderPaySheet() {
+  const s = studentById(draft.studentId);
+  let choice = '';
+  if (s.billing === 'session') {
+    const st = sessionOf(s);
+    if (st.unpaidCount > s.packageCount) {
+      const opts = [[s.packageCount, s.packageFee, `${s.packageCount}회 ${won(s.packageFee)}`], [st.unpaidCount, st.unpaidAmount, `전체 ${st.unpaidCount}회 ${won(st.unpaidAmount)}`]];
+      choice = `<div class="field"><span class="lb">받을 만큼 고르기</span><div class="seg wide">${opts.map(([c, amt, t]) => `<button type="button" class="${Number(draft.count) === c && Number(draft.feeMan) === amt / 10000 ? 'on' : ''}" data-act="pay-preset" data-c="${c}" data-f="${amt / 10000}">${t}</button>`).join('')}</div></div>`;
+    }
+  }
+  return `<div class="sheet-head"><h2>${esc(s.name)} 레슨비 받음</h2><button class="icon-btn" data-act="close" aria-label="닫기">✕</button></div>
+    ${choice}
+    <div class="two"><div class="field"><label for="p-amt">금액 (만원)</label><input id="p-amt" inputmode="decimal" data-bind="feeMan" value="${esc(draft.feeMan)}"></div>
+    ${s.billing === 'session'
+      ? `<div class="field"><label for="p-cnt">몇 회분</label><input id="p-cnt" inputmode="numeric" data-bind="count" value="${esc(draft.count)}"></div>`
+      : `<div class="field"><label for="p-mon">몇 월분</label><input id="p-mon" type="month" data-bind="month" value="${esc(draft.month)}"></div>`}</div>
+    <div class="field"><label for="p-date">받은 날짜</label><input id="p-date" type="date" data-bind="date" value="${esc(draft.date)}"></div>
+    ${draft.error ? `<p class="err">${esc(draft.error)}</p>` : ''}
+    <button class="primary" data-act="save-pay">기록</button>`;
+}
+
+function renderConfirm() {
+  return `<div class="sheet-head"><h2>${esc(sheet.title)}</h2></div><p class="note">${esc(sheet.body)}</p>
+    <div class="actions"><button class="secondary" data-act="close">취소</button><button class="secondary danger" data-act="${sheet.confirmAct}" data-id="${sheet.id || ''}">${esc(sheet.confirmLabel)}</button></div>`;
+}
+
+/* ---------- 그리기 ---------- */
+function render() {
+  const wrapBefore = document.getElementById('grid-wrap');
+  const pos = wrapBefore ? [wrapBefore.scrollLeft, wrapBefore.scrollTop] : null;
+  const dueCount = dueList().filter((d) => d.state === 'due').length;
+  const showMonth = tab === 'grid' || tab === 'money';
+  const title = { students: '학생', backup: '백업' }[tab];
+  const head = showMonth
+    ? `<button class="icon-btn" data-act="month" data-d="-1" aria-label="이전 달">‹</button><h1>${ymLabel(ym)} ${heart()}</h1><button class="icon-btn" data-act="month" data-d="1" aria-label="다음 달">›</button>${ym !== L.ymOf(L.todayStr()) ? '<button class="text-btn" data-act="this-month">오늘</button>' : ''}`
+    : `<h1>${title}</h1>`;
+  const views = { grid: renderGrid, money: renderMoney, students: renderStudents, backup: renderBackup };
+  const demo = data.students.some((s) => s.demoSeed) ? '<div class="demo-note"><span>예시 학생이 들어 있습니다.</span><button data-act="ask-clear-demo">지우고 시작</button></div>' : '';
+  document.getElementById('app').innerHTML = `<header class="topbar">${head}</header>${demo}<main>${views[tab]()}</main>
+    <nav class="tabs" aria-label="화면">${[['grid', '레슨표'], ['money', '수납'], ['students', '학생'], ['backup', '백업']].map(([k, t]) => `<button class="${tab === k ? 'on' : ''}" data-act="tab" data-tab="${k}">${t}${k === 'money' && dueCount ? `<span class="count">${dueCount}</span>` : ''}</button>`).join('')}</nav>`;
+  const wrap = document.getElementById('grid-wrap');
+  if (wrap) {
+    if (pos && !scrollToToday) { wrap.scrollLeft = pos[0]; wrap.scrollTop = pos[1]; }
+    else if (scrollToToday) {
+      const row = document.getElementById('today-row');
+      if (row) wrap.scrollTop = Math.max(0, row.offsetTop - wrap.querySelector('thead').offsetHeight - 46);
+      scrollToToday = false;
+    }
+  }
+  renderOverlay();
+}
+function renderOverlay() {
+  const el = document.getElementById('overlay');
+  if (!sheet) { el.innerHTML = ''; return; }
+  const body = { student: () => renderStudentSheet(studentById(sheet.id)), form: renderFormSheet, pay: renderPaySheet, song: renderSongSheet, confirm: renderConfirm }[sheet.type]();
+  const previous = el.querySelector('.sheet');
+  const top = previous ? previous.scrollTop : 0;
+  el.innerHTML = `<div class="backdrop" data-act="backdrop"><div class="sheet" role="dialog" aria-modal="true">${body}</div></div>`;
+  el.querySelector('.sheet').scrollTop = top;
+  if (previous) el.querySelector('.sheet').style.animation = 'none';
+}
+function toast(text, undo) {
+  document.querySelector('.toast')?.remove();
+  clearTimeout(toastTimer);
+  const t = document.createElement('div');
+  t.className = 'toast'; t.setAttribute('role', 'status');
+  t.innerHTML = `<span>${esc(text)}</span>${undo ? '<button>되돌리기</button>' : ''}`;
+  if (undo) t.querySelector('button').onclick = () => { undo(); t.remove(); save(); render(); };
+  document.body.appendChild(t);
+  toastTimer = setTimeout(() => t.remove(), undo ? 5000 : 2500);
+}
+
+/* ---------- 동작 ---------- */
+function newStudentDraft() {
+  return { name: '', grade: '', song: '', studentPhone: '', parentPhone: '', gender: '', age: '', weekly: 1, days: [], note: '', billing: 'session', packageCount: 8, feeMan: 60, payTiming: 'pre', priorDone: 0, payDay: 1, error: '' };
+}
+const actions = {
+  tab(el) { tab = el.dataset.tab; if (tab === 'grid') scrollToToday = true; render(); },
+  month(el) { ym = L.shiftMonth(ym, Number(el.dataset.d)); scrollToToday = true; render(); },
+  'this-month'() { ym = L.ymOf(L.todayStr()); scrollToToday = true; render(); },
+  close() { sheet = null; renderOverlay(); },
+  backdrop(el, ev) { if (ev.target === el && sheet.type !== 'form') { sheet = null; renderOverlay(); } },
+  toggle(el) {
+    const { id, date } = el.dataset;
+    const s = studentById(id);
+    const i = data.lessons.findIndex((l) => l.studentId === id && l.date === date);
+    if (i >= 0) {
+      const [removed] = data.lessons.splice(i, 1);
+      save(); render();
+      toast(`${s.name} ${mdLabel(date)} 레슨을 지웠습니다`, () => data.lessons.push(removed));
+    } else {
+      data.lessons.push({ id: uid(), studentId: id, date });
+      save(); render();
+    }
+  },
+  'open-student'(el) { sheet = { type: 'student', id: el.dataset.id }; renderOverlay(); },
+  'open-song'(el) {
+    const s = studentById(el.dataset.id);
+    draft = { studentId: s.id, song: s.song || '' };
+    sheet = { type: 'song' }; renderOverlay();
+    document.getElementById('f-song-only')?.focus();
+  },
+  'save-song'() {
+    const s = studentById(draft.studentId);
+    s.song = String(draft.song || '').trim();
+    sheet = null; save(); render();
+    toast('곡명을 저장했습니다');
+  },
+  'add-student'() { draft = newStudentDraft(); sheet = { type: 'form' }; renderOverlay(); },
+  'edit-student'(el) {
+    const s = studentById(el.dataset.id);
+    const fee = s.billing === 'session' ? s.packageFee : s.monthlyFee;
+    draft = { ...newStudentDraft(), ...s, days: [...(s.days || [])], gender: s.gender || '', age: s.age ?? '', note: s.note || '', feeMan: (Number(fee) || 0) / 10000, error: '' };
+    sheet = { type: 'form' }; renderOverlay();
+  },
+  seg(el) { draft[el.dataset.field] = el.dataset.value; renderOverlay(); },
+  day(el) { const d = Number(el.dataset.day); draft.days = draft.days.includes(d) ? draft.days.filter((x) => x !== d) : [...draft.days, d]; renderOverlay(); },
+  preset(el) { draft.packageCount = el.dataset.c; draft.feeMan = el.dataset.f; renderOverlay(); },
+  'pay-preset'(el) { draft.count = el.dataset.c; draft.feeMan = el.dataset.f; renderOverlay(); },
+  'save-student'() {
+    const d = draft;
+    if (!String(d.name).trim()) { d.error = '이름을 입력해 주세요.'; renderOverlay(); return; }
+    if (!L.GRADES.some((g) => g.key === d.grade)) { d.error = '학생 분류를 골라 주세요.'; renderOverlay(); return; }
+    const man = Number(d.feeMan);
+    if (!(man >= 0)) { d.error = '금액은 숫자로 입력해 주세요. 예: 60'; renderOverlay(); return; }
+    const count = Math.round(Number(d.packageCount));
+    if (d.billing === 'session' && !(count >= 1)) { d.error = '묶음 횟수는 1 이상의 숫자로 입력해 주세요.'; renderOverlay(); return; }
+    const payDay = Math.round(Number(d.payDay));
+    if (d.billing === 'monthly' && !(payDay >= 1 && payDay <= 31)) { d.error = '납부일은 1부터 31 사이로 입력해 주세요.'; renderOverlay(); return; }
+    const base = { name: String(d.name).trim(), grade: d.grade, song: String(d.song || '').trim(), studentPhone: String(d.studentPhone || '').trim(), parentPhone: String(d.parentPhone || '').trim(), gender: d.gender, age: d.age === '' ? '' : Number(d.age) || '', weekly: Number(d.weekly) || '', days: d.days, note: d.note, billing: d.billing };
+    const money = d.billing === 'session'
+      ? { packageCount: count, packageFee: Math.round(man * 10000), payTiming: d.payTiming, priorDone: Math.max(0, Number(d.priorDone) || 0) }
+      : { monthlyFee: Math.round(man * 10000), payDay };
+    if (d.id) {
+      Object.assign(studentById(d.id), base, money);
+      sheet = { type: 'student', id: d.id };
+    } else {
+      data.students.push({ id: uid(), active: true, joinedAt: L.todayStr(), ...base, ...money });
+      sheet = null; tab = 'grid';
+    }
+    save(); render();
+    toast(d.id ? '저장했습니다' : `${base.name} 학생을 추가했습니다`);
+  },
+  'open-pay'(el) {
+    const s = studentById(el.dataset.id);
+    const today = L.todayStr();
+    draft = s.billing === 'session'
+      ? { studentId: s.id, feeMan: (s.packageFee || 0) / 10000, count: s.packageCount, date: today, error: '' }
+      : { studentId: s.id, feeMan: (s.monthlyFee || 0) / 10000, month: el.dataset.month || L.ymOf(today), date: today, error: '' };
+    sheet = { type: 'pay' }; renderOverlay();
+  },
+  'save-pay'() {
+    const s = studentById(draft.studentId);
+    const man = Number(draft.feeMan);
+    if (!(man > 0)) { draft.error = '금액은 숫자로 입력해 주세요. 예: 60'; renderOverlay(); return; }
+    if (!draft.date) { draft.error = '받은 날짜를 골라 주세요.'; renderOverlay(); return; }
+    const p = { id: uid(), studentId: s.id, date: draft.date, amount: Math.round(man * 10000) };
+    if (s.billing === 'session') {
+      p.count = Math.round(Number(draft.count));
+      if (!(p.count >= 1)) { draft.error = '몇 회분인지 숫자로 입력해 주세요.'; renderOverlay(); return; }
+    } else {
+      if (!draft.month) { draft.error = '몇 월분인지 골라 주세요.'; renderOverlay(); return; }
+      if (data.payments.some((x) => x.studentId === s.id && x.month === draft.month)) { draft.error = `${ymLabel(draft.month)}분은 이미 기록되어 있습니다.`; renderOverlay(); return; }
+      p.month = draft.month;
+    }
+    data.payments.push(p);
+    sheet = { type: 'student', id: s.id };
+    save(); render();
+    toast(`${HEART} ${won(p.amount)} 받음으로 기록했습니다`, () => { data.payments = data.payments.filter((x) => x.id !== p.id); });
+  },
+  'del-pay'(el) {
+    const i = data.payments.findIndex((p) => p.id === el.dataset.id);
+    const [removed] = data.payments.splice(i, 1);
+    save(); render();
+    toast('수납 기록을 지웠습니다', () => data.payments.push(removed));
+  },
+  'ask-graduate'(el) {
+    const s = studentById(el.dataset.id);
+    sheet = { type: 'confirm', title: `${s.name} 학생을 졸업 처리할까요?`, body: '다음 달부터 레슨표와 받을 차례에서 빠집니다. 기록은 남고, 학생 탭에서 재학생으로 되돌릴 수 있습니다.', confirmAct: 'graduate', confirmLabel: '졸업 처리', id: s.id };
+    renderOverlay();
+  },
+  graduate(el) {
+    const s = studentById(el.dataset.id);
+    s.active = false; s.graduatedAt = L.todayStr();
+    sheet = null; save(); render();
+    toast(`${s.name} 학생을 졸업 처리했습니다`, () => { s.active = true; delete s.graduatedAt; });
+  },
+  restore(el) { const s = studentById(el.dataset.id); s.active = true; delete s.graduatedAt; save(); render(); },
+  'ask-delete'(el) {
+    const s = studentById(el.dataset.id);
+    sheet = { type: 'confirm', title: `${s.name} 학생을 삭제할까요?`, body: '레슨과 수납 기록까지 모두 사라지고 되돌릴 수 없습니다. 기록을 남기려면 졸업 상태로 두세요.', confirmAct: 'delete-student', confirmLabel: '완전히 삭제', id: s.id };
+    renderOverlay();
+  },
+  'delete-student'(el) {
+    const id = el.dataset.id;
+    data.students = data.students.filter((s) => s.id !== id);
+    data.lessons = data.lessons.filter((l) => l.studentId !== id);
+    data.payments = data.payments.filter((p) => p.studentId !== id);
+    sheet = null; save(); render();
+  },
+  'ask-clear-demo'() {
+    const names = data.students.filter((s) => s.demoSeed).map((s) => s.name).join(', ');
+    sheet = { type: 'confirm', title: '예시 학생을 지울까요?', body: `예시 학생(${names})과 그 학생들의 레슨·수납 기록만 지웁니다. 직접 추가한 학생은 그대로 남습니다.`, confirmAct: 'clear-demo', confirmLabel: '지우고 시작' };
+    renderOverlay();
+  },
+  'clear-demo'() { data = L.clearDemoSeed(data); sheet = null; save(); tab = data.students.length ? 'grid' : 'students'; scrollToToday = true; render(); },
+  'ask-wipe'() { sheet = { type: 'confirm', title: '전체 기록을 지울까요?', body: '모든 학생, 레슨, 수납 기록이 사라집니다. 먼저 백업을 만들어 두세요.', confirmAct: 'wipe', confirmLabel: '전체 지우기' }; renderOverlay(); },
+  wipe() { data = blank(); sheet = null; save(); tab = 'students'; render(); },
+  async 'backup-file'() {
+    const text = backupText();
+    const name = `레슨장부-백업-${L.todayStr()}.json`;
+    const file = new File([text], name, { type: 'application/json' });
+    let done = false;
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: name }); done = true; }
+    } catch (e) { if (e.name === 'AbortError') return; }
+    if (!done) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(file); a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+    data.lastBackup = new Date().toISOString(); save(); render();
+    toast('백업 파일을 만들었습니다. 저장되지 않았다면 내용 복사를 쓰세요');
+  },
+  async 'backup-copy'() {
+    const text = backupText();
+    const out = document.getElementById('backup-out');
+    out.value = text; out.hidden = false;
+    let copied = false;
+    try { await navigator.clipboard.writeText(text); copied = true; } catch (e) { out.select(); }
+    if (copied) { data.lastBackup = new Date().toISOString(); save(); }
+    toast(copied ? '복사했습니다. 메모 앱에 붙여 넣어 두세요' : '아래 내용을 직접 선택해 복사해 주세요');
+  },
+};
+
+document.addEventListener('click', (ev) => {
+  const el = ev.target.closest('[data-act]');
+  if (el && actions[el.dataset.act]) actions[el.dataset.act](el, ev);
+});
+document.addEventListener('input', (ev) => {
+  const key = ev.target.dataset && ev.target.dataset.bind;
+  if (key && draft) draft[key] = ev.target.value;
+});
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Enter' && !ev.isComposing && ev.target.id === 'f-song-only') { ev.preventDefault(); actions['save-song'](); }
+});
+document.addEventListener('change', (ev) => {
+  if (ev.target.id !== 'restore-file' || !ev.target.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+      if (!L.validateBackup(parsed)) throw new Error('형식');
+      data = { ...blank(), ...L.migrateData(parsed) }; save(); tab = 'grid'; scrollToToday = true; render();
+      toast(`학생 ${data.students.length}명의 기록을 불러왔습니다`);
+    } catch (e) { toast('레슨장부 백업 파일이 아닙니다. 다른 파일을 골라 주세요'); }
+  };
+  reader.readAsText(ev.target.files[0]);
+});
+
+(async function start() {
+  data = await load();
+  if (!idbStuck) save();
+  try { navigator.storage?.persist?.(); } catch (e) { /* 지원하지 않는 환경 */ }
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  render();
+})();
+</script>
+</body>
+</html>

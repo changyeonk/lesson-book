@@ -1,0 +1,12 @@
+{
+  "name": "국악 레슨장부",
+  "short_name": "레슨장부",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#FFF9EF",
+  "theme_color": "#FFF9EF",
+  "icons": [
+    { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
