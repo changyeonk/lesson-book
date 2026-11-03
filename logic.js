@@ -87,23 +87,25 @@
       settled: unpaidCount === 0 && paidLessons > 0,
     };
 
+    // 받을 차례(due)인 학생은 정산 완료가 아니다. settled는 미수납 0이면서 due가 아닐 때만 참이다.
+    const finish = (r) => ({ ...r, settled: r.settled && r.state !== 'due' });
     if (student.payTiming === 'post') {
       // 끝나고 받기: 안 받은 회차가 묶음 크기만큼 쌓이면 수납 필요. 그때까지 쌓인 값을 받는다.
       if (unpaidCount >= fallback) {
         const owed = Math.floor(unpaidCount / fallback);
-        return { ...result, state: 'due', left: 0, owed, dueAmount: unpaidAmount, label: `${owed > 1 ? owed + '묶음 ' : ''}수납 필요` };
+        return finish({ ...result, state: 'due', left: 0, owed, dueAmount: unpaidAmount, label: `${owed > 1 ? owed + '묶음 ' : ''}수납 필요` });
       }
       // 미리 받아 둔 회차가 남아 있으면 그만큼 다음 수납이 늦어진다. 남은 회차가 없으면 packageCount와 같다.
       const left = fallback - unpaidCount + Math.max(0, paidLessons - done);
-      return { ...result, state: left <= 1 ? 'soon' : 'ok', left, owed: 0, label: `${left}회 후 수납` };
+      return finish({ ...result, state: left <= 1 ? 'soon' : 'ok', left, owed: 0, label: `${left}회 후 수납` });
     }
     // 먼저 받기: 받은 횟수를 다 쓰면 다음 묶음 값을 받는다. 그보다 많이 쌓였으면 쌓인 값을 받는다.
     const left = paidLessons - done;
     if (left <= 0) {
       const owed = Math.max(1, Math.floor(unpaidCount / fallback));
-      return { ...result, state: 'due', left: 0, owed, dueAmount: Math.max(Number(student.packageFee) || 0, unpaidAmount), label: '수납 필요' };
+      return finish({ ...result, state: 'due', left: 0, owed, dueAmount: Math.max(Number(student.packageFee) || 0, unpaidAmount), label: '수납 필요' });
     }
-    return { ...result, state: left <= 1 ? 'soon' : 'ok', left, owed: 0, label: `${left}회 남음` };
+    return finish({ ...result, state: left <= 1 ? 'soon' : 'ok', left, owed: 0, label: `${left}회 남음` });
   }
 
   // 월정액: 그달 안에서 몇 번째 레슨인지 센다.
@@ -251,10 +253,85 @@
     };
   }
 
+  // 월정액 학생이 아직 내지 않은 달. 등록한 달부터 이번 달까지 훑는다(지난달 미수납을 놓치지 않게).
+  function unpaidMonths(data, student, today = todayStr()) {
+    if (student.billing === 'session') return [];
+    const out = [];
+    const thisYm = ymOf(today);
+    for (let m = ymOf(student.joinedAt || today); m <= thisYm; m = shiftMonth(m, 1)) {
+      if (monthlyStatus(data, student, m, today).state === 'due') out.push(m);
+    }
+    return out;
+  }
+
+  // 같은 학생의 같은 달 수납이 이미 있는지. 수정할 때는 자기 자신을 빼고 본다.
+  const monthTaken = (data, studentId, month, exceptId) =>
+    data.payments.some((p) => p.studentId === studentId && p.month === month && p.id !== exceptId);
+
+  // 수납 탭의 받을 차례. 재학생 전원을 분류 순서·이름 순으로 늘 같은 자리에 둔다.
+  // 월별 납입은 보고 있는 달 기준, 횟수 납입은 달과 상관없이 지금까지의 누적 기준이다.
+  // action: 'pay' 받음 버튼, 'early' 아직 수납 시점 전의 받음 버튼, 'edit' 받은 기록(✓)
+  function collectionList(data, ym, today = todayStr()) {
+    const gi = (s) => GRADES.findIndex((g) => g.key === gradeOf(s));
+    const active = data.students.filter((s) => s.active !== false)
+      .sort((a, b) => gi(a) - gi(b) || String(a.name || '').localeCompare(String(b.name || ''), 'ko'));
+    const monthly = [];
+    const session = [];
+    active.forEach((s) => {
+      if (s.billing === 'session') {
+        const st = sessionStatus(data, s);
+        const pays = paymentsOf(data, s.id);
+        const last = pays.length ? pays[pays.length - 1] : null;
+        const action = st.state === 'due' || st.state === 'soon' ? 'pay' : last ? 'edit' : 'early';
+        session.push({ s, st, action, payment: action === 'edit' ? last : null, amount: st.state === 'due' ? st.dueAmount : 0 });
+      } else {
+        const st = monthlyStatus(data, s, ym, today);
+        if (st.state === 'none') return; // 등록 전 달, 졸업 후 달
+        monthly.push({ s, st, action: st.payment ? 'edit' : 'pay', payment: st.payment, amount: st.state === 'due' ? Number(s.monthlyFee) || 0 : 0 });
+      }
+    });
+    return { monthly, session };
+  }
+
+  // 지금 실제로 받아야 할 전부. 보는 달과 상관없다. 탭의 빨간 숫자와 수납 탭 합계가 같은 값을 쓴다.
+  // 월별: 등록한 달부터 이번 달까지의 미수납 달마다 1건, 횟수: 지금 수납 필요인 학생마다 1건.
+  function dueSummary(data, today = todayStr()) {
+    let count = 0;
+    let total = 0;
+    data.students.filter((s) => s.active !== false).forEach((s) => {
+      if (s.billing === 'session') {
+        const st = sessionStatus(data, s);
+        if (st.state === 'due') { count += 1; total += st.dueAmount; }
+      } else {
+        const months = unpaidMonths(data, s, today);
+        count += months.length;
+        total += months.length * (Number(s.monthlyFee) || 0);
+      }
+    });
+    return { count, total };
+  }
+
+  // 붙여 넣은 백업 글. 앞뒤 여분 글자나 메모 앱이 바꾼 둥근 따옴표가 있어도 읽는다. 아니면 null.
+  function parseBackupText(text) {
+    const raw = String(text || '').trim();
+    const start = raw.indexOf('{');
+    const end = raw.lastIndexOf('}');
+    if (start < 0 || end <= start) return null;
+    const body = raw.slice(start, end + 1);
+    for (const candidate of [body, body.replace(/[“”]/g, '"').replace(/[‘’]/g, "'")]) {
+      try {
+        const obj = JSON.parse(candidate);
+        if (validateBackup(obj)) return obj;
+      } catch (e) { /* 다음 방법으로 */ }
+    }
+    return null;
+  }
+
   const api = {
     toDate, todayStr, ymOf, daysInMonth, shiftMonth, weeksInMonth, lessonsOf, paymentsOf, manText,
     sessionStatus, monthlyStatus, weekSummary, weekTotals, weekSessionValue, clearDemoSeed, GRADES, guessGrade, gradeOf, groupByGrade,
     visibleStudents, paymentsInMonth, validateBackup, isUntouchedOldDemo, migrateData,
+    unpaidMonths, monthTaken, collectionList, dueSummary, parseBackupText,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.LessonLogic = api;

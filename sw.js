@@ -1,5 +1,5 @@
 // 인터넷이 없어도 열리도록 앱 파일을 보관한다. 파일을 고치면 CACHE 번호를 올린다.
-const CACHE = 'lessonbook-4';
+const CACHE = 'lessonbook-5';
 const FILES = ['./', 'index.html', 'logic.js', 'manifest.webmanifest', 'icon-180.png', 'icon-512.png'];
 
 self.addEventListener('install', (e) => e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES))));

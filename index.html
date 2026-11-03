@@ -27,6 +27,9 @@
   --green: #37804F; --green-soft: #E3F3E6; --green-ink: #2C6A40;
   --blue: #3A72B8; --blue-soft: #E2EEFB; --blue-ink: #2F5F9C;
   --pink: #C8437A; --pink-soft: #FDE6EF; --pink-ink: #A92F62;
+  /* 수납 탭 전용: 월별 납입 파랑, 횟수 납입 장미빛 빨강(미수납 경고색 --due와 다른 값). 글자용 -ink는 연한 칠 위에서도 대비 6 이상 */
+  --mon: #2E68B8; --mon-soft: #E4EEFB; --mon-ink: #245699;
+  --ses: #C8324F; --ses-soft: #FCE6EA; --ses-ink: #A3263F;
   --due: #C4472E; --due-soft: #FBE6DC; --soon: #6B4E00; --soon-soft: #FBEFC6; --ok: #2C6A40; --ok-soft: #E3F3E6;
   --sun: #B8392F; --sat: #2F62A8; --today: #FFF0B8; --on-accent: #FFFFFF;
   --week-a: #FFFDF8; --week-b: #FBF5EA; --week-th-a: #F7EEDF; --week-th-b: #F3E9DA; --week-sum: #F7EEDF;
@@ -37,6 +40,8 @@
 .gr-adult { --c: var(--green); --c-soft: var(--green-soft); --c-ink: var(--green-ink); }
 .gr-high { --c: var(--blue); --c-soft: var(--blue-soft); --c-ink: var(--blue-ink); }
 .gr-junior { --c: var(--pink); --c-soft: var(--pink-soft); --c-ink: var(--pink-ink); }
+.bill-mon { --c: var(--mon); --c-soft: var(--mon-soft); --c-ink: var(--mon-ink); }
+.bill-ses { --c: var(--ses); --c-soft: var(--ses-soft); --c-ink: var(--ses-ink); }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--body); overflow: hidden; font-variant-numeric: tabular-nums; }
@@ -55,7 +60,7 @@ main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .scroll { flex: 1; overflow-y: auto; padding: 4px var(--gutter-r) 24px var(--gutter-l); display: flex; flex-direction: column; gap: 22px; }
 
 /* 레슨표 */
-.grid-wrap { flex: 1; min-height: 0; overflow: auto; border-top: 1px solid var(--line); background: var(--surface); overscroll-behavior: contain; }
+.grid-wrap { flex: 1; min-height: 0; overflow: auto; touch-action: pan-x pan-y; border-top: 1px solid var(--line); background: var(--surface); overscroll-behavior: contain; }
 table.grid { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
 .grid th, .grid td { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 0; background: var(--surface); }
 .grid thead th { position: sticky; z-index: 3; }
@@ -143,7 +148,7 @@ table.mini thead th { font-size: 12px; color: var(--muted); font-weight: 600; }
 
 /* 아래 시트 */
 .backdrop { position: fixed; inset: 0; background: rgb(74 54 64 / .42); z-index: 20; display: flex; align-items: flex-end; justify-content: center; }
-.sheet { background: var(--surface); width: 100%; max-width: 560px; max-height: 90%; overflow-y: auto; border-radius: 24px 24px 0 0; padding: 14px var(--gutter-r) calc(18px + env(safe-area-inset-bottom, 0px)) var(--gutter-l); display: flex; flex-direction: column; gap: 14px; animation: rise .18s ease-out; }
+.sheet { background: var(--surface); width: 100%; max-width: 560px; max-height: 90%; overflow-y: auto; border-radius: 24px 24px 0 0; padding: 14px var(--gutter-r) calc(18px + 52px + env(safe-area-inset-bottom, 0px)) var(--gutter-l); display: flex; flex-direction: column; gap: 14px; animation: rise .18s ease-out; }
 @keyframes rise { from { transform: translateY(24px); } }
 @media (prefers-reduced-motion: reduce) { .sheet { animation: none; } }
 .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; position: sticky; top: -14px; background: var(--surface); margin: -14px 0 0; padding-block: 12px 6px; z-index: 1; }
@@ -166,8 +171,42 @@ table.mini thead th { font-size: 12px; color: var(--muted); font-weight: 600; }
 .facts dt { color: var(--muted); } .facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .tel { color: var(--accent-ink); font-weight: 600; -webkit-user-select: text; user-select: text; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(66px + env(safe-area-inset-bottom, 0px)); z-index: 30; display: flex; gap: 14px; align-items: center; background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 16px; font-size: 14px; width: max-content; max-width: calc(100% - 32px); }
+.toast.top { bottom: auto; top: calc(10px + env(safe-area-inset-top, 0px)); }
 .toast button { color: inherit; font-weight: 800; text-decoration: underline; min-height: 28px; white-space: nowrap; }
 #restore-file { max-width: 100%; }
+#restore-text { font-size: 16px; height: 96px; }
+/* 레슨표 확대·축소: 배율이 1이 아닐 때만 위에 작게 나온다 */
+/* 오늘·100%로 버튼이 나오면 제목을 줄여 한 줄을 지킨다(tight 1개, tight2 2개) */
+.topbar.tight h1 { white-space: nowrap; }
+.topbar.tight2 .icon-btn { min-width: 34px; }
+.topbar.tight2 h1 { font-size: 19px; }
+.topbar.tight2 h1 .heart { display: none; }
+@media (max-width: 360px) {
+  .topbar.tight .icon-btn { min-width: 34px; }
+  .topbar.tight h1 { font-size: 19px; }
+  .topbar.tight h1 .heart { display: none; }
+  .topbar.tight2 h1 .yr { display: none; }
+}
+.zoom-btn { height: 32px; padding: 0 9px; font-size: 13px; font-weight: 700; color: var(--accent-ink); white-space: nowrap; }
+/* 수납 탭 받을 차례: 촘촘한 목록 */
+.bill-head { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; font: 400 15px/1.3 var(--display); color: var(--c-ink); }
+.bill-head::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+.bill-head small { font: 12px/1 var(--body); color: var(--muted); margin-left: 2px; }
+.row.compact { min-height: 44px; padding: 5px 0; gap: 8px; }
+.row.compact .tag { width: 5px; }
+.row.compact .ttl { font-size: 14px; line-height: 1.3; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.row.compact .desc { font-size: 12px; line-height: 1.35; color: var(--muted-strong); }
+.row.compact .pill { font-size: 10.5px; padding: 3px 6px; }
+.row.compact .primary.small { min-height: 32px; height: 32px; padding: 0 12px; border-radius: 12px; font-size: 13px; }
+.primary.outline { background: var(--surface); color: var(--accent-ink); box-shadow: inset 0 0 0 1.5px var(--accent); }
+/* 수납 탭 받음: 분류 핑크와 섞이지 않게 진한 글자색 바탕 */
+.primary.pay-btn { background: var(--fg); color: var(--on-accent); }
+.primary.pay-btn.outline { background: var(--surface); color: var(--fg); box-shadow: inset 0 0 0 1.5px var(--fg); }
+.check-btn { flex: none; width: 44px; height: 32px; border-radius: 12px; background: var(--ok); color: var(--on-accent); font-size: 17px; font-weight: 800; line-height: 32px; text-align: center; }
+.past-due { color: var(--due); font-weight: 700; }
+.kind { display: inline-block; font-size: 11px; font-weight: 700; line-height: 1; padding: 3px 6px; border-radius: 999px; background: var(--c-soft); color: var(--c-ink); vertical-align: 1px; }
+.row.tap { cursor: pointer; }
+.row .chev { color: var(--muted); font-size: 18px; flex: none; }
 .backup-text { width: 100%; height: 110px; font-size: 12px; font-family: ui-monospace, monospace; padding: 8px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); }
 </style>
 </head>
@@ -309,29 +348,11 @@ const studentById = (id) => data.students.find((s) => s.id === id);
 const sessionOf = (s) => L.sessionStatus(data, s);
 const monthlyOf = (s, month = ym) => L.monthlyStatus(data, s, month);
 
-function dueList() {
-  const out = [];
-  data.students.filter((s) => s.active !== false).forEach((s) => {
-    if (s.billing === 'session') {
-      const st = sessionOf(s);
-      if (st.state === 'due') {
-        const extra = s.payTiming === 'post' || !st.unpaidCount ? '' : ` · 미수납 ${st.unpaidCount}회 ${won(st.unpaidAmount)}`;
-        const main = s.payTiming === 'post' ? `(${st.pos}/${st.size}) ${st.unpaidCount}회 ${won(st.unpaidAmount)} 받을 차례` : `${st.unpaidCount > s.packageCount ? `전체 ${st.unpaidCount}회 ${won(st.dueAmount)}` : `${s.packageCount}회 ${won(st.dueAmount)}`} 받을 차례`;
-        out.push({ s, state: 'due', amount: st.dueAmount, desc: main + (st.unpaidCount > s.packageCount ? '' : extra) });
-      } else if (st.state === 'soon') {
-        out.push({ s, state: 'soon', amount: 0, desc: `${st.left}회 후 ${won(s.packageFee)}` });
-      }
-    } else {
-      // 이번 달만 보면 지난달 미수납을 놓치므로 등록한 달부터 훑는다.
-      const thisYm = L.ymOf(L.todayStr());
-      for (let m = L.ymOf(s.joinedAt || L.todayStr()); m <= thisYm; m = L.shiftMonth(m, 1)) {
-        const st = monthlyOf(s, m);
-        if (st.state === 'due') out.push({ s, state: 'due', month: m, amount: Number(s.monthlyFee) || 0, desc: `${ymLabel(m)}분 ${won(s.monthlyFee)} · 납부일 ${Number(st.dueDate.slice(8))}일` });
-      }
-    }
-  });
-  return out.sort((a, b) => (a.state === 'due' ? 0 : 1) - (b.state === 'due' ? 0 : 1));
-}
+// 탭의 빨간 숫자와 수납 탭 '지금 받을 금액'은 같은 함수(dueSummary)다: 횟수 수납 필요 + 월별 미수납 달(지난달 포함)
+function dueBadge() { return L.dueSummary(data).count; }
+const payKind = (p, s) => (p.count ? 'session' : p.month ? 'monthly' : s ? s.billing : 'monthly') === 'session' ? 'session' : 'monthly';
+const kindTag = (kind) => `<span class="kind bill-${kind === 'session' ? 'ses' : 'mon'}">${kind === 'session' ? '횟수' : '월별'}</span>`;
+const payWhat = (p) => (p.count ? `${p.count}회분` : `${Number((p.month || '').slice(5))}월분`);
 
 /* ---------- 레슨표 ---------- */
 function headCell(s) {
@@ -387,7 +408,7 @@ function renderGrid() {
     return `${dayRows}<tr class="week-sum"><th scope="row">${week.n}주 ${totals.lessons}회<span class="wk-line">회차 ${man(L.weekSessionValue(data, week.dates))}</span>${totals.received ? `<span class="wk-pay">${HEART} ${man(totals.received)}</span>` : ''}</th>${sumCells}</tr>`;
   }).join('');
   const groupCells = groups.map((g) => `<th class="group gr-${g.key}" colspan="${g.students.length}"><span>${g.label}</span></th>`).join('');
-  return `<div class="grid-wrap" id="grid-wrap"><table class="grid"><thead>
+  return `<div class="grid-wrap" id="grid-wrap"><table class="grid"${gridZoom !== 1 ? ` style="zoom:${gridZoom}"` : ''}><thead>
     <tr class="row-group"><th class="corner"></th>${groupCells}</tr>
     <tr class="row-names"><th class="corner">날짜</th>${ordered.map(headCell).join('')}</tr>
   </thead><tbody>${rows}</tbody></table></div>
@@ -398,9 +419,34 @@ function renderGrid() {
 function renderMoney() {
   const pays = L.paymentsInMonth(data, ym);
   const total = pays.reduce((a, p) => a + (Number(p.amount) || 0), 0);
-  const due = dueList();
-  const dueNow = due.filter((d) => d.state === 'due');
-  const dueTotal = dueNow.reduce((a, d) => a + d.amount, 0);
+  const today = L.todayStr();
+  const list = L.collectionList(data, ym, today);
+  const due = L.dueSummary(data, today);
+  const M = Number(ym.slice(5));
+  const isThis = ym === L.ymOf(today);
+  const monthlyRow = (r) => {
+    const { s, st } = r;
+    const earlier = L.unpaidMonths(data, s, today).filter((m) => m !== ym);
+    const paidNote = st.payment ? ` · ${mdLabel(st.payment.date)} 받음` : st.state === 'upcoming' ? ` · ${Number(st.dueDate.slice(8))}일 납부` : '';
+    const desc = `${M}월분 ${won(s.monthlyFee)} · ${isThis ? '이달' : `${M}월`} ${st.count}회${paidNote}`;
+    const btn = r.action === 'edit'
+      ? `<button class="check-btn" data-act="edit-pay" data-id="${st.payment.id}" aria-label="${esc(s.name)} ${M}월분 받음, 눌러서 고치기">✓</button>`
+      : `<button class="primary small pay-btn" data-act="open-pay" data-id="${s.id}" data-month="${ym}" aria-label="${esc(s.name)} ${M}월분 받음 기록">받음</button>`;
+    return `<div class="row compact bill-mon"><span class="tag"></span>
+      <button class="grow" style="text-align:left" data-act="open-student" data-id="${s.id}"><div class="ttl">${esc(s.name)}${st.state === 'due' ? ' <span class="pill due">미수납</span>' : ''}</div><div class="desc">${esc(desc)}${earlier.length ? ` · <span class="past-due">${earlier.map((m) => `${Number(m.slice(5))}월`).join(', ')} 미수납</span>` : ''}</div></button>${btn}</div>`;
+  };
+  const sessionRow = (r) => {
+    const { s, st } = r;
+    let desc = `(${st.pos}/${st.size}) ${st.settled ? '정산 완료' : `누적 ${won(st.accrued)}`}`;
+    if (st.state === 'due') desc += ` · ${won(st.dueAmount)} 받을 차례`;
+    else desc += ` · ${st.label}`;
+    const pill = st.state === 'due' || st.state === 'soon' ? ` <span class="pill ${st.state}">${esc(st.label)}</span>` : '';
+    const btn = r.action === 'edit'
+      ? `<button class="check-btn" data-act="edit-pay" data-id="${r.payment.id}" aria-label="${esc(s.name)} ${mdLabel(r.payment.date)} 수납 기록됨, 눌러서 고치기">✓</button>`
+      : `<button class="primary small pay-btn ${r.action === 'early' ? 'outline' : ''}" data-act="open-pay" data-id="${s.id}" aria-label="${esc(s.name)} 레슨비 받음 기록">받음</button>`;
+    return `<div class="row compact bill-ses"><span class="tag"></span>
+      <button class="grow" style="text-align:left" data-act="open-student" data-id="${s.id}"><div class="ttl">${esc(s.name)}${pill}</div><div class="desc">${esc(desc)}</div></button>${btn}</div>`;
+  };
   const monthly = data.students.filter((s) => s.billing !== 'session' && (s.active !== false || data.lessons.some((l) => l.studentId === s.id)));
   const months = [-3, -2, -1, 0].map((n) => L.shiftMonth(ym, n));
   const monthlyTable = monthly.length ? `<div class="mini-wrap"><table class="mini"><thead><tr><th>이름</th>${months.map((m) => `<th>${Number(m.slice(5))}월</th>`).join('')}</tr></thead><tbody>
@@ -410,16 +456,19 @@ function renderMoney() {
       return `<td>${st.count}회${tagText}</td>`;
     }).join('')}</tr>`).join('')}
   </tbody></table></div>` : '<p class="note">월정액 학생이 아직 없습니다.</p>';
+  const empty = !list.monthly.length && !list.session.length;
   return `<div class="scroll">
-    <div class="sum"><div><b>${won(total)}</b><span>${Number(ym.slice(5))}월에 받은 금액</span></div><div><b>${won(dueTotal)}</b><span>지금 받을 금액 ${dueNow.length}건</span></div></div>
-    <section><h2>받을 차례</h2>${due.length ? `<div class="list">${due.map((d) => `
-      <div class="row"><span class="tag ${gradeClass(d.s)}"></span>
-        <button class="grow" style="text-align:left" data-act="open-student" data-id="${d.s.id}"><div class="ttl">${esc(d.s.name)} <span class="pill ${d.state}">${d.state === 'due' ? '수납 필요' : '곧 수납'}</span></div><div class="desc">${esc(d.desc)}</div></button>
-        <button class="primary small" data-act="open-pay" data-id="${d.s.id}" ${d.month ? `data-month="${d.month}"` : ''}>받음</button></div>`).join('')}</div>` : '<p class="note">지금 받을 레슨비가 없습니다.</p>'}</section>
+    <div class="sum"><div><b>${won(total)}</b><span>${M}월에 받은 금액</span></div><div><b>${won(due.total)}</b><span>지금 받을 금액 ${due.count}건</span></div></div>
+    <section><h2>받을 차례</h2>
+      ${empty ? '<p class="note">재학생이 없습니다.</p>' : ''}
+      ${list.monthly.length ? `<h3 class="bill-head bill-mon">월별 납입<small>${M}월 기준</small></h3><div class="list" style="margin-bottom:14px">${list.monthly.map(monthlyRow).join('')}</div>` : ''}
+      ${list.session.length ? `<h3 class="bill-head bill-ses">횟수 납입<small>지금까지 누적</small></h3><div class="list">${list.session.map(sessionRow).join('')}</div>` : ''}
+    </section>
     <section><h2>월정액 달별 레슨 횟수</h2>${monthlyTable}</section>
-    <section><h2>${Number(ym.slice(5))}월 수납 내역</h2>${pays.length ? `<div class="list">${pays.map((p) => {
+    <section><h2>${M}월 수납 내역</h2>${pays.length ? `<div class="list">${pays.map((p) => {
       const s = studentById(p.studentId);
-      return `<div class="row"><span class="tag ${s ? gradeClass(s) : 'done'}"></span><div class="grow"><div class="ttl">${esc(s ? s.name : '삭제된 학생')} · ${won(p.amount)}</div><div class="desc">${mdLabel(p.date)} 받음 · ${p.count ? `${p.count}회분` : `${Number((p.month || '').slice(5))}월분`}</div></div></div>`;
+      const kind = payKind(p, s);
+      return `<button class="row tap bill-${kind === 'session' ? 'ses' : 'mon'}" data-act="edit-pay" data-id="${p.id}" aria-label="${esc(s ? s.name : '삭제된 학생')} ${won(p.amount)} 수납, 눌러서 고치기"><span class="tag"></span><span class="grow"><div class="ttl">${esc(s ? s.name : '삭제된 학생')} · ${won(p.amount)} ${kindTag(kind)}</div><div class="desc">${mdLabel(p.date)} 받음 · ${payWhat(p)}</div></span><span class="chev" aria-hidden="true">›</span></button>`;
     }).join('')}</div>` : '<p class="note">이 달에 받은 레슨비가 없습니다.</p>'}</section>
   </div>`;
 }
@@ -457,8 +506,11 @@ function renderBackup() {
       <div class="actions"><button class="primary" data-act="backup-file">파일로 저장</button><button class="secondary" data-act="backup-copy">내용 복사</button></div>
       <textarea id="backup-out" class="backup-text" style="margin-top:8px" readonly hidden aria-label="백업 내용"></textarea></section>
     <section><h2>백업 불러오기</h2>
-      <p class="note" style="margin-bottom:8px">지금 기록을 백업 파일의 내용으로 바꿉니다.</p>
-      <input id="restore-file" type="file" accept="application/json,.json,.txt" aria-label="백업 파일 선택"></section>
+      <p class="note" style="margin-bottom:8px">다른 기기나 새 버전으로 옮길 때 이 화면에서 불러오세요. 불러오면 지금 기록이 백업 내용으로 바뀌므로, 바꾸기 전에 한 번 더 묻습니다.</p>
+      <div class="field" style="margin-bottom:12px"><label for="restore-file">백업 파일 고르기</label><input id="restore-file" type="file" aria-label="백업 파일 선택"></div>
+      <div class="field"><label for="restore-text">또는 '내용 복사'로 받은 글 붙여 넣기</label>
+      <textarea id="restore-text" class="backup-text" placeholder="여기를 길게 눌러 붙여 넣기" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea></div>
+      <div class="actions" style="margin-top:8px"><button class="secondary" data-act="restore-paste">붙여 넣은 내용 불러오기</button></div></section>
     <section><h2>모두 지우기</h2><button class="secondary danger" data-act="ask-wipe">전체 기록 지우기</button></section>
   </div>`;
 }
@@ -498,7 +550,7 @@ function renderStudentSheet(s) {
     ${status}
     ${s.active !== false ? `<button class="primary" data-act="open-pay" data-id="${s.id}">레슨비 받음 기록</button>` : ''}
     <dl class="facts">${facts.map(([k, v, isHtml]) => `<dt>${k}</dt><dd>${isHtml ? v : esc(v)}</dd>`).join('')}<dt>최근</dt><dd>${esc(recent || '기록 없음')}</dd></dl>
-    <section><h2>수납 내역</h2>${pays.length ? `<div class="list">${pays.slice(0, 12).map((p) => `<div class="row" style="min-height:48px"><div class="grow"><div class="ttl">${won(p.amount)}</div><div class="desc">${mdLabel(p.date)} 받음 · ${p.count ? `${p.count}회분` : `${Number((p.month || '').slice(5))}월분`}</div></div><button class="secondary danger" data-act="del-pay" data-id="${p.id}">지우기</button></div>`).join('')}</div>` : '<p class="note">받은 기록이 없습니다.</p>'}</section>
+    <section><h2>수납 내역</h2>${pays.length ? `<div class="list">${pays.slice(0, 12).map((p) => `<div class="row" style="min-height:48px"><button class="grow" style="text-align:left;min-height:44px" data-act="edit-pay" data-id="${p.id}" aria-label="${won(p.amount)} ${mdLabel(p.date)} 수납, 눌러서 고치기"><div class="ttl">${won(p.amount)} <span class="chev" aria-hidden="true">›</span></div><div class="desc">${mdLabel(p.date)} 받음 · ${payWhat(p)}</div></button><button class="secondary danger" data-act="del-pay" data-id="${p.id}">지우기</button></div>`).join('')}</div>` : '<p class="note">받은 기록이 없습니다.</p>'}</section>
     <div class="actions"><button class="secondary" data-act="edit-student" data-id="${s.id}">정보 수정</button>
     ${s.active === false ? `<button class="secondary" data-act="restore" data-id="${s.id}">재학생으로 되돌리기</button><button class="secondary danger" data-act="ask-delete" data-id="${s.id}">완전히 삭제</button>` : `<button class="secondary" data-act="ask-graduate" data-id="${s.id}">졸업 처리</button>`}</div>`;
 }
@@ -540,25 +592,29 @@ function renderSongSheet() {
     <button class="primary" data-act="save-song">저장</button>`;
 }
 
+// 새 수납 기록과 수납 수정이 같은 시트를 쓴다. 수정이면 draft.editId가 있다.
 function renderPaySheet() {
   const s = studentById(draft.studentId);
+  const name = s ? s.name : '삭제된 학생';
   let choice = '';
-  if (s.billing === 'session') {
+  if (!draft.editId && s && draft.billing === 'session') {
     const st = sessionOf(s);
     if (st.unpaidCount > s.packageCount) {
       const opts = [[s.packageCount, s.packageFee, `${s.packageCount}회 ${won(s.packageFee)}`], [st.unpaidCount, st.unpaidAmount, `전체 ${st.unpaidCount}회 ${won(st.unpaidAmount)}`]];
       choice = `<div class="field"><span class="lb">받을 만큼 고르기</span><div class="seg wide">${opts.map(([c, amt, t]) => `<button type="button" class="${Number(draft.count) === c && Number(draft.feeMan) === amt / 10000 ? 'on' : ''}" data-act="pay-preset" data-c="${c}" data-f="${amt / 10000}">${t}</button>`).join('')}</div></div>`;
     }
   }
-  return `<div class="sheet-head"><h2>${esc(s.name)} 레슨비 받음</h2><button class="icon-btn" data-act="close" aria-label="닫기">✕</button></div>
+  return `<div class="sheet-head"><h2>${esc(name)} ${draft.editId ? '수납 고치기' : '레슨비 받음'}</h2><button class="icon-btn" data-act="close" aria-label="닫기">✕</button></div>
+    ${draft.editId ? `<p class="note">${kindTag(draft.billing)} 잘못 적었으면 고쳐서 저장하세요. 필요 없으면 지울 수 있습니다.</p>` : ''}
     ${choice}
     <div class="two"><div class="field"><label for="p-amt">금액 (만원)</label><input id="p-amt" inputmode="decimal" data-bind="feeMan" value="${esc(draft.feeMan)}"></div>
-    ${s.billing === 'session'
+    ${draft.billing === 'session'
       ? `<div class="field"><label for="p-cnt">몇 회분</label><input id="p-cnt" inputmode="numeric" data-bind="count" value="${esc(draft.count)}"></div>`
       : `<div class="field"><label for="p-mon">몇 월분</label><input id="p-mon" type="month" data-bind="month" value="${esc(draft.month)}"></div>`}</div>
     <div class="field"><label for="p-date">받은 날짜</label><input id="p-date" type="date" data-bind="date" value="${esc(draft.date)}"></div>
     ${draft.error ? `<p class="err">${esc(draft.error)}</p>` : ''}
-    <button class="primary" data-act="save-pay">기록</button>`;
+    <button class="primary" data-act="save-pay">${draft.editId ? '고친 내용 저장' : '기록'}</button>
+    ${draft.editId ? `<button class="secondary danger" data-act="del-pay" data-id="${draft.editId}">이 수납 지우기</button>` : ''}`;
 }
 
 function renderConfirm() {
@@ -566,15 +622,92 @@ function renderConfirm() {
     <div class="actions"><button class="secondary" data-act="close">취소</button><button class="secondary danger" data-act="${sheet.confirmAct}" data-id="${sheet.id || ''}">${esc(sheet.confirmLabel)}</button></div>`;
 }
 
+/* ---------- 레슨표 확대·축소 ----------
+   두 손가락 폭에 따라 표에만 CSS zoom을 준다(날짜 열·이름 줄 고정은 그대로). 배율은 기록과 따로 저장한다. */
+const ZOOM_KEY = 'lessonbook.zoom';
+const clampZoom = (z) => Math.min(1.6, Math.max(0.4, z));
+let gridZoom = (() => { try { const z = Number(localStorage.getItem(ZOOM_KEY)); return z > 0 ? clampZoom(z) : 1; } catch (e) { return 1; } })();
+let pinch = null;        // 두 손가락 시작 거리·배율·기준점
+let gestureUntil = 0;     // 이 시각까지 표의 누름을 기록으로 보지 않는다(손가락을 떼는 순간 오기록 방지)
+let overlayGuardUntil = 0; // 수납 저장 직후 잠깐, 화면 어디의 누름도 받지 않는다(알림의 되돌리기만 예외)
+function storeZoom() {
+  try { if (gridZoom === 1) localStorage.removeItem(ZOOM_KEY); else localStorage.setItem(ZOOM_KEY, String(gridZoom)); } catch (e) { /* 배율 저장 실패는 무시 */ }
+}
+function showZoomBtn() {
+  const btn = document.getElementById('zoom-reset');
+  if (btn) btn.hidden = gridZoom === 1;
+  const bar = document.querySelector('.topbar');
+  if (bar) {
+    const extra = (btn && !btn.hidden ? 1 : 0) + (bar.querySelector('[data-act=this-month]') ? 1 : 0);
+    bar.classList.toggle('tight', extra >= 1);
+    bar.classList.toggle('tight2', extra >= 2);
+  }
+}
+// 화면의 (cx, cy) 지점이 확대 전후에 같은 곳에 머물도록 스크롤을 맞춘다. anchor는 표 안 좌표(배율 1 기준).
+function setGridZoom(z, cx, cy, anchor) {
+  const wrap = document.getElementById('grid-wrap');
+  const table = wrap && wrap.querySelector('table.grid');
+  gridZoom = clampZoom(z);
+  if (!table) { showZoomBtn(); return; }
+  const r = wrap.getBoundingClientRect();
+  const ox = cx === undefined ? 0 : cx - r.left;
+  const oy = cy === undefined ? 0 : cy - r.top;
+  const a = anchor || { x: wrap.scrollLeft / zoomNow(table) + ox / zoomNow(table), y: wrap.scrollTop / zoomNow(table) + oy / zoomNow(table) };
+  table.style.zoom = gridZoom;
+  wrap.scrollLeft = a.x * gridZoom - ox;
+  wrap.scrollTop = a.y * gridZoom - oy;
+  showZoomBtn();
+}
+const zoomNow = (table) => Number(table.style.zoom) || 1;
+const touchDist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+function bindGridZoom(wrap) {
+  // 손가락이 2개가 되는 순간(한 손가락 스크롤 중 두 번째 손가락 포함) 바로 표 확대로 넘어간다.
+  wrap.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 2) return;
+    const [a, b] = e.touches;
+    const r = wrap.getBoundingClientRect();
+    const cx = (a.clientX + b.clientX) / 2;
+    const cy = (a.clientY + b.clientY) / 2;
+    pinch = { d0: Math.max(10, touchDist(a, b)), z0: gridZoom, anchor: { x: (wrap.scrollLeft + cx - r.left) / gridZoom, y: (wrap.scrollTop + cy - r.top) / gridZoom } };
+    gestureUntil = Infinity;
+  }, { passive: true });
+  wrap.addEventListener('touchmove', (e) => {
+    if (!pinch || e.touches.length < 2) return;
+    if (e.cancelable) e.preventDefault(); // 스크롤 중이면 막을 수 없지만 touch-action이 페이지 확대를 막는다
+    const [a, b] = e.touches;
+    setGridZoom(pinch.z0 * touchDist(a, b) / pinch.d0, (a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2, pinch.anchor);
+  }, { passive: false });
+  const end = (e) => {
+    if (pinch && e.touches.length < 2) {
+      pinch = null;
+      if (Math.abs(gridZoom - 1) < 0.05) setGridZoom(1); // 100% 근처면 딱 맞춘다
+      storeZoom();
+    }
+    if (e.touches.length === 0 && gestureUntil === Infinity) gestureUntil = Date.now() + 450;
+  };
+  wrap.addEventListener('touchend', end);
+  wrap.addEventListener('touchcancel', end);
+  // 데스크톱 시험용: ctrl+휠(트랙패드 두 손가락 벌리기)
+  wrap.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    setGridZoom(gridZoom * Math.exp(-e.deltaY * 0.01), e.clientX, e.clientY);
+    clearTimeout(bindGridZoom.t);
+    bindGridZoom.t = setTimeout(storeZoom, 300);
+  }, { passive: false });
+}
+// 아이폰 사파리의 페이지 확대 제스처. 레슨표에서는 표만 확대·축소한다.
+['gesturestart', 'gesturechange'].forEach((type) => document.addEventListener(type, (e) => { if (tab === 'grid') e.preventDefault(); }, { passive: false }));
+
 /* ---------- 그리기 ---------- */
 function render() {
   const wrapBefore = document.getElementById('grid-wrap');
   const pos = wrapBefore ? [wrapBefore.scrollLeft, wrapBefore.scrollTop] : null;
-  const dueCount = dueList().filter((d) => d.state === 'due').length;
+  const dueCount = dueBadge();
   const showMonth = tab === 'grid' || tab === 'money';
   const title = { students: '학생', backup: '백업' }[tab];
   const head = showMonth
-    ? `<button class="icon-btn" data-act="month" data-d="-1" aria-label="이전 달">‹</button><h1>${ymLabel(ym)} ${heart()}</h1><button class="icon-btn" data-act="month" data-d="1" aria-label="다음 달">›</button>${ym !== L.ymOf(L.todayStr()) ? '<button class="text-btn" data-act="this-month">오늘</button>' : ''}`
+    ? `<button class="icon-btn" data-act="month" data-d="-1" aria-label="이전 달">‹</button><h1><span class="yr">${ym.slice(0, 4)}년 </span>${Number(ym.slice(5))}월 ${heart()}</h1><button class="icon-btn" data-act="month" data-d="1" aria-label="다음 달">›</button>${ym !== L.ymOf(L.todayStr()) ? '<button class="text-btn" data-act="this-month">오늘</button>' : ''}${tab === 'grid' ? `<button class="text-btn zoom-btn" id="zoom-reset" data-act="zoom-reset" aria-label="표 크기 100%로 되돌리기" ${gridZoom === 1 ? 'hidden' : ''}>100%로</button>` : ''}`
     : `<h1>${title}</h1>`;
   const views = { grid: renderGrid, money: renderMoney, students: renderStudents, backup: renderBackup };
   const demo = data.students.some((s) => s.demoSeed) ? '<div class="demo-note"><span>예시 학생이 들어 있습니다.</span><button data-act="ask-clear-demo">지우고 시작</button></div>' : '';
@@ -582,17 +715,23 @@ function render() {
     <nav class="tabs" aria-label="화면">${[['grid', '레슨표'], ['money', '수납'], ['students', '학생'], ['backup', '백업']].map(([k, t]) => `<button class="${tab === k ? 'on' : ''}" data-act="tab" data-tab="${k}">${t}${k === 'money' && dueCount ? `<span class="count">${dueCount}</span>` : ''}</button>`).join('')}</nav>`;
   const wrap = document.getElementById('grid-wrap');
   if (wrap) {
+    bindGridZoom(wrap);
     if (pos && !scrollToToday) { wrap.scrollLeft = pos[0]; wrap.scrollTop = pos[1]; }
     else if (scrollToToday) {
+      // 배율이 달라도 맞도록 화면 좌표로 잰다
       const row = document.getElementById('today-row');
-      if (row) wrap.scrollTop = Math.max(0, row.offsetTop - wrap.querySelector('thead').offsetHeight - 46);
+      if (row) wrap.scrollTop = Math.max(0, wrap.scrollTop + row.getBoundingClientRect().top - wrap.querySelector('thead').getBoundingClientRect().bottom - 46 * gridZoom);
       scrollToToday = false;
     }
   }
+  showZoomBtn();
   renderOverlay();
 }
+let shownSheetKey = null;
 function renderOverlay() {
   const el = document.getElementById('overlay');
+  const key = sheet ? [sheet.type, sheet.id || '', sheet.type === 'pay' && draft ? draft.editId || draft.studentId : ''].join('|') : null;
+  if (key !== shownSheetKey) { shownSheetKey = key; dismissToast(); }
   if (!sheet) { el.innerHTML = ''; return; }
   const body = { student: () => renderStudentSheet(studentById(sheet.id)), form: renderFormSheet, pay: renderPaySheet, song: renderSongSheet, confirm: renderConfirm }[sheet.type]();
   const previous = el.querySelector('.sheet');
@@ -601,11 +740,16 @@ function renderOverlay() {
   el.querySelector('.sheet').scrollTop = top;
   if (previous) el.querySelector('.sheet').style.animation = 'none';
 }
-function toast(text, undo) {
+// 알림과 그 되돌리기를 바로 버린다. 시트를 열거나 닫을 때 쓴다(지난 동작의 되돌리기가 새 시트 위에서 눌리지 않게).
+function dismissToast() {
   document.querySelector('.toast')?.remove();
   clearTimeout(toastTimer);
+}
+function toast(text, undo) {
+  dismissToast();
   const t = document.createElement('div');
-  t.className = 'toast'; t.setAttribute('role', 'status');
+  // 시트가 열려 있으면 시트 버튼을 덮지 않도록 화면 위쪽(시트가 닿지 않는 자리)에 띄운다
+  t.className = `toast${sheet ? ' top' : ''}`; t.setAttribute('role', 'status');
   t.innerHTML = `<span>${esc(text)}</span>${undo ? '<button>되돌리기</button>' : ''}`;
   if (undo) t.querySelector('button').onclick = () => { undo(); t.remove(); save(); render(); };
   document.body.appendChild(t);
@@ -683,39 +827,75 @@ const actions = {
     save(); render();
     toast(d.id ? '저장했습니다' : `${base.name} 학생을 추가했습니다`);
   },
+  // 수납 탭에서 연 시트는 저장 후 닫혀 수납 탭에 머문다. 학생 상세에서 열었으면 상세로 돌아간다.
   'open-pay'(el) {
     const s = studentById(el.dataset.id);
     const today = L.todayStr();
+    const returnTo = sheet && sheet.type === 'student' ? s.id : null;
     draft = s.billing === 'session'
-      ? { studentId: s.id, feeMan: (s.packageFee || 0) / 10000, count: s.packageCount, date: today, error: '' }
-      : { studentId: s.id, feeMan: (s.monthlyFee || 0) / 10000, month: el.dataset.month || L.ymOf(today), date: today, error: '' };
+      ? { studentId: s.id, billing: 'session', feeMan: (s.packageFee || 0) / 10000, count: s.packageCount, date: today, error: '', returnTo }
+      : { studentId: s.id, billing: 'monthly', feeMan: (s.monthlyFee || 0) / 10000, month: el.dataset.month || L.ymOf(today), date: today, error: '', returnTo };
+    sheet = { type: 'pay' }; renderOverlay();
+  },
+  'edit-pay'(el) {
+    const p = data.payments.find((x) => x.id === el.dataset.id);
+    if (!p) return;
+    const s = studentById(p.studentId);
+    const returnTo = sheet && sheet.type === 'student' ? sheet.id : null;
+    draft = { editId: p.id, studentId: p.studentId, billing: payKind(p, s), feeMan: (Number(p.amount) || 0) / 10000, count: p.count ?? (s && s.packageCount) ?? '', month: p.month || L.ymOf(p.date), date: p.date, error: '', returnTo };
     sheet = { type: 'pay' }; renderOverlay();
   },
   'save-pay'() {
-    const s = studentById(draft.studentId);
     const man = Number(draft.feeMan);
     if (!(man > 0)) { draft.error = '금액은 숫자로 입력해 주세요. 예: 60'; renderOverlay(); return; }
     if (!draft.date) { draft.error = '받은 날짜를 골라 주세요.'; renderOverlay(); return; }
-    const p = { id: uid(), studentId: s.id, date: draft.date, amount: Math.round(man * 10000) };
-    if (s.billing === 'session') {
-      p.count = Math.round(Number(draft.count));
-      if (!(p.count >= 1)) { draft.error = '몇 회분인지 숫자로 입력해 주세요.'; renderOverlay(); return; }
+    const fields = { date: draft.date, amount: Math.round(man * 10000) };
+    if (draft.billing === 'session') {
+      fields.count = Math.round(Number(draft.count));
+      if (!(fields.count >= 1)) { draft.error = '몇 회분인지 숫자로 입력해 주세요.'; renderOverlay(); return; }
     } else {
       if (!draft.month) { draft.error = '몇 월분인지 골라 주세요.'; renderOverlay(); return; }
-      if (data.payments.some((x) => x.studentId === s.id && x.month === draft.month)) { draft.error = `${ymLabel(draft.month)}분은 이미 기록되어 있습니다.`; renderOverlay(); return; }
-      p.month = draft.month;
+      if (L.monthTaken(data, draft.studentId, draft.month, draft.editId)) { draft.error = `${ymLabel(draft.month)}분은 이미 기록되어 있습니다. 달을 바꿔 주세요.`; renderOverlay(); return; }
+      fields.month = draft.month;
     }
+    sheet = draft.returnTo && studentById(draft.returnTo) ? { type: 'student', id: draft.returnTo } : null;
+    overlayGuardUntil = Date.now() + 450; // 기록을 두 번 빠르게 눌러도 바뀐 화면의 버튼이 눌리지 않게
+    if (draft.editId) {
+      const i = data.payments.findIndex((x) => x.id === draft.editId);
+      if (i < 0) { save(); render(); return; }
+      const before = data.payments[i];
+      data.payments[i] = { ...before, ...fields };
+      save(); render();
+      toast(`${HEART} 수납 기록을 고쳤습니다`, () => { const j = data.payments.findIndex((x) => x.id === before.id); if (j >= 0) data.payments[j] = before; });
+      return;
+    }
+    const p = { id: uid(), studentId: draft.studentId, ...fields };
     data.payments.push(p);
-    sheet = { type: 'student', id: s.id };
     save(); render();
     toast(`${HEART} ${won(p.amount)} 받음으로 기록했습니다`, () => { data.payments = data.payments.filter((x) => x.id !== p.id); });
   },
   'del-pay'(el) {
     const i = data.payments.findIndex((p) => p.id === el.dataset.id);
+    if (i < 0) return;
     const [removed] = data.payments.splice(i, 1);
+    if (sheet && sheet.type === 'pay') sheet = draft.returnTo && studentById(draft.returnTo) ? { type: 'student', id: draft.returnTo } : null;
     save(); render();
     toast('수납 기록을 지웠습니다', () => data.payments.push(removed));
   },
+  'restore-paste'() {
+    const text = document.getElementById('restore-text')?.value || '';
+    if (!text.trim()) { toast('백업 내용을 붙여 넣어 주세요'); return; }
+    askRestore(L.parseBackupText(text), '붙여 넣은 내용이 레슨장부 백업이 아닙니다. 내용 복사로 받은 글 전체를 붙여 넣어 주세요');
+  },
+  'restore-apply'() {
+    if (!pendingRestore) { sheet = null; renderOverlay(); return; }
+    const before = data;
+    data = { ...blank(), ...L.migrateData(pendingRestore) };
+    pendingRestore = null;
+    sheet = null; save(); tab = 'grid'; scrollToToday = true; render();
+    toast(`학생 ${data.students.length}명의 기록을 불러왔습니다`, () => { data = before; });
+  },
+  'zoom-reset'() { setGridZoom(1); storeZoom(); },
   'ask-graduate'(el) {
     const s = studentById(el.dataset.id);
     sheet = { type: 'confirm', title: `${s.name} 학생을 졸업 처리할까요?`, body: '다음 달부터 레슨표와 받을 차례에서 빠집니다. 기록은 남고, 학생 탭에서 재학생으로 되돌릴 수 있습니다.', confirmAct: 'graduate', confirmLabel: '졸업 처리', id: s.id };
@@ -776,6 +956,9 @@ const actions = {
 };
 
 document.addEventListener('click', (ev) => {
+  // 두 손가락 확대·축소 중이거나 막 뗀 순간의 누름은 표에 기록하지 않는다
+  if (Date.now() < gestureUntil && ev.target.closest && ev.target.closest('#grid-wrap')) return;
+  if (Date.now() < overlayGuardUntil && ev.target.closest && !ev.target.closest('.toast')) return;
   const el = ev.target.closest('[data-act]');
   if (el && actions[el.dataset.act]) actions[el.dataset.act](el, ev);
 });
@@ -786,18 +969,25 @@ document.addEventListener('input', (ev) => {
 document.addEventListener('keydown', (ev) => {
   if (ev.key === 'Enter' && !ev.isComposing && ev.target.id === 'f-song-only') { ev.preventDefault(); actions['save-song'](); }
 });
+// 백업 불러오기(파일·붙여 넣기 모두): 변환은 migrateData를 거치고, 바꾸기 전에 확인 시트를 연다.
+let pendingRestore = null;
+function askRestore(parsed, failText) {
+  if (!parsed) { toast(failText); return; }
+  pendingRestore = parsed;
+  const count = (o) => `학생 ${o.students.length}명, 레슨 ${o.lessons.length}회, 수납 ${o.payments.length}건`;
+  sheet = { type: 'confirm', title: '백업 내용으로 바꿀까요?', body: `지금 기록을 백업 내용으로 바꿉니다. ${count(parsed)}. 지금 이 기기의 기록(${count(data)})은 사라집니다.`, confirmAct: 'restore-apply', confirmLabel: '불러오기' };
+  renderOverlay();
+}
 document.addEventListener('change', (ev) => {
   if (ev.target.id !== 'restore-file' || !ev.target.files[0]) return;
+  const input = ev.target;
   const reader = new FileReader();
   reader.onload = () => {
-    try {
-      const parsed = JSON.parse(reader.result);
-      if (!L.validateBackup(parsed)) throw new Error('형식');
-      data = { ...blank(), ...L.migrateData(parsed) }; save(); tab = 'grid'; scrollToToday = true; render();
-      toast(`학생 ${data.students.length}명의 기록을 불러왔습니다`);
-    } catch (e) { toast('레슨장부 백업 파일이 아닙니다. 다른 파일을 골라 주세요'); }
+    input.value = ''; // 같은 파일을 다시 골라도 동작하게
+    askRestore(L.parseBackupText(reader.result), '레슨장부 백업 파일이 아닙니다. 다른 파일을 골라 주세요');
   };
-  reader.readAsText(ev.target.files[0]);
+  reader.onerror = () => toast('파일을 읽지 못했습니다. 내용 붙여 넣기를 써 주세요');
+  reader.readAsText(input.files[0]);
 });
 
 (async function start() {
